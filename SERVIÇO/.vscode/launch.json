@@ -1,0 +1,14 @@
+﻿{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI (uvicorn)",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--host", "", "--port", ""],
+      "envFile": "\\\\.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+﻿{
+  "python.defaultInterpreterPath": ".venv\\\\Scripts\\\\python.exe",
+  "python.analysis.typeCheckingMode": "basic",
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit"
+    }
+  },
+  "ruff.lint.args": ["--select=E,F,I", "--line-length=100"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportCallIssue": "none"
+  }
+}
