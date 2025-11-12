@@ -1,3 +1,26 @@
+# COMANDOS
+Instalar dependências: pip install -r requirements.txt
+
+Ativar venv: .\.venv\Scripts\Activate.ps1
+Arrancar a API: python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+Abrir docs: http://127.0.0.1:8000/docs
+Testar saúde: http://127.0.0.1:8000/health
+Testar BD: http://127.0.0.1:8000/db/ping
+Ver se o .env não tem BOM: Get-Content .env -Encoding Byte -TotalCount 3 | % { "{0:X2}" -f $_ }
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ESTRUTURA
 
 requirements.txt: 
@@ -36,11 +59,3 @@ app/services/vision.py:
 tests/test_health.py: 
     teste rápido com pytest para o endpoint /health. Garante que a API arranca e responde status: ok. Serve de exemplo para acrescentar mais testes unitários/integração.
 
-# COMANDOS
-Ativar venv: .\.venv\Scripts\Activate.ps1
-Instalar dependências: pip install -r requirements.txt
-Arrancar a API: python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-Abrir docs: http://127.0.0.1:8000/docs
-Testar saúde: http://127.0.0.1:8000/health
-Testar BD: http://127.0.0.1:8000/db/ping
-Ver se o .env não tem BOM: Get-Content .env -Encoding Byte -TotalCount 3 | % { "{0:X2}" -f $_ }

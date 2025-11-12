@@ -10,10 +10,21 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.1.0  # Para chamadas à API
-  provider: ^6.1.0  # Gestão de estado (opcional mas recomendado)
-
+  http: ^1.2.0  # Para chamadas à API
+  provider: ^6.1.0  # Gestão de estado
   cupertino_icons: ^1.0.8
+
+  # Base de Dados OFFLINE v
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  #########################
+
+
+
+
+
+
+
 
 dev_dependencies:
   flutter_test:
@@ -24,3 +35,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  # Assets para base de dados offline
+  assets:
+    - assets/sql/TABELAS.sql
+    - assets/sql/DADOS.sql

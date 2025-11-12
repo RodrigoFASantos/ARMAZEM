@@ -1,8 +1,11 @@
 ﻿from fastapi import FastAPI, HTTPException
 from .config import settings
 from .db import ping_db
+from .CARREGAR_DADOS import router as sync_router
 
 app = FastAPI(title="AR-ERP API", version="0.1.0")
+
+app.include_router(sync_router)
 
 @app.get("/health")
 def health():
