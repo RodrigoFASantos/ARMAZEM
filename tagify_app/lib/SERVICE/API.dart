@@ -4,12 +4,47 @@ import 'package:tagify_app/models/models.dart';
 
 class ApiService {
   // IMPORTANTE: 
-  // Telemóvel físico -> usar o IP do PC
+  // Telemóvel físico -> usar o IP do PC: http://127.0.0.1:8000
   // Emulador Android: http://10.0.2.2:8000
-  // Emulador iOS: http://127.0.0.1:8000
-  static const String baseUrl = 'http://127.0.0.1:8000';
+  static const String baseUrl = 'http://10.0.2.2:8000';
 
-  // Testar ligação à API
+  // ============================================
+  // AUTENTICAÇÃO
+  // ============================================
+  
+  Future<LoginResponse> login(String username, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(response.bodyBytes));
+        return LoginResponse.fromJson(json);
+      } else {
+        return LoginResponse(
+          success: false,
+          message: 'Erro no servidor: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Erro no login: $e');
+      return LoginResponse(
+        success: false,
+        message: 'Erro de conexão: $e',
+      );
+    }
+  }
+
+  // ============================================
+  // HEALTH CHECK
+  // ============================================
+
   Future<bool> healthCheck() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/health'));
@@ -20,7 +55,10 @@ class ApiService {
     }
   }
 
-  // Buscar artigo por ID
+  // ============================================
+  // ARTIGOS
+  // ============================================
+
   Future<Artigo?> getArtigoById(int id) async {
     try {
       final response = await http.get(
@@ -40,7 +78,6 @@ class ApiService {
     }
   }
 
-  // Buscar artigo por código (QR/NFC/RFID/Referência)
   Future<Artigo?> getArtigoByCodigo(String codigo) async {
     try {
       final response = await http.get(

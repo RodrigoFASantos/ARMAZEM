@@ -1,4 +1,5 @@
 // Exporta todos os modelos num único ficheiro
+export '../models/model_UTILIZADORES.dart';
 export '../models/model_ARMAZEM.dart';
 export '../models/model_ARTIGO.dart';
 export '../models/model_EQUIPAMENTO.dart';

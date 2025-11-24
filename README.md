@@ -6,6 +6,17 @@ Uma aplicação móvel de Realidade Aumentada (AR) que apoia técnicos e colabor
 Através da câmara do telemóvel, o utilizador pode identificar equipamentos, visualizar instruções de manutenção, consultar dados técnicos e registar intervenções no sistema, tudo em tempo real e de forma intuitiva.
 O objetivo é melhorar a eficiência operacional e reduzir o erro humano, tornando o processo mais rápido e visual.
 
+# EXECUTAR
+# Verificar se tem emulador instalado
+flutter emulators
+
+# Se aparecer algum, executar:
+flutter emulators --launch <nome_emulador>
+
+# Depois correr a app:
+flutter run
+
+
 
 
 # ESTRUTURA
