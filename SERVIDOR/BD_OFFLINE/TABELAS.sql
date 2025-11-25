@@ -1,5 +1,4 @@
 -- Schema SQLite para ARMAZEM (Base de Dados Offline)
--- Criado automaticamente 
 
 -- Tabela: Utilizador
 CREATE TABLE IF NOT EXISTS UTILIZADOR (
@@ -8,7 +7,7 @@ CREATE TABLE IF NOT EXISTS UTILIZADOR (
     Email TEXT NOT NULL UNIQUE,
     Username TEXT NOT NULL UNIQUE,
     Password TEXT NOT NULL,
-    Ativo INTEGER DEFAULT 1,
+    Ativo INTEGER DEFAULT 1
 );
 
 -- Índice para login rápido
@@ -71,7 +70,7 @@ CREATE TABLE IF NOT EXISTS EQUIPAMENTO (
     Modelo TEXT,
     Data_aquisicao TEXT,
     Requer_inspecao INTEGER DEFAULT 0,
-    Ciclo_inpecao_dias INTEGER,
+    Ciclo_inspecao_dias INTEGER,
     FOREIGN KEY (ID_artigo) REFERENCES ARTIGO(ID_artigo),
     FOREIGN KEY (ID_Estado) REFERENCES ESTADO(ID_Estado)
 );

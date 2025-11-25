@@ -115,14 +115,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  _getModeText(_currentMode),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
               ),
             ),
           ),
@@ -289,20 +281,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
     );
   }
 
-  String _getModeText(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.rfid:
-        return 'RFID - Aproxime a etiqueta';
-      case ScanMode.nfc:
-        return 'NFC - Aproxime o equipamento';
-      case ScanMode.ar:
-        return 'AR - Aponte para o equipamento';
-      case ScanMode.qr:
-        return 'QR Code - Aponte para o código';
-      case ScanMode.barcode:
-        return 'Código de Barras - Aponte para o código';
-    }
-  }
 }
 
 // Modos de identificação

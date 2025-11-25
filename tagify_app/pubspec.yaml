@@ -41,4 +41,3 @@ flutter:
   # Assets para base de dados offline
   assets:
     - assets/sql/TABELAS.sql
-    - assets/sql/DADOS.sql

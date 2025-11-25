@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../SERVICE/API.dart';
+import '../SERVICE/sync_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,10 +14,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
+  final _syncService = SyncService();
   
   bool _isLoading = false;
+  bool _isSyncing = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+  String? _syncMessage;
 
   @override
   void dispose() {
@@ -49,8 +53,11 @@ class _LoginScreenState extends State<LoginScreen> {
             SnackBar(
               content: Text('Bem-vindo, ${response.utilizador!.nome}!'),
               backgroundColor: Colors.green,
+              duration: const Duration(seconds: 1),
             ),
           );
+          
+          // Navega para a Home (scanner integrado)
           Navigator.of(context).pushReplacementNamed('/home');
         }
       } else {
@@ -62,6 +69,73 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage = 'Erro ao conectar ao servidor';
+      });
+    }
+  }
+
+  Future<void> _handleSync() async {
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = 'Iniciando sincronização...';
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await _syncService.syncAllData(
+        onProgress: (message) {
+          if (mounted) {
+            setState(() => _syncMessage = message);
+          }
+        },
+      );
+
+      setState(() => _isSyncing = false);
+
+      if (result.success) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 32),
+                    SizedBox(width: 12),
+                    Text('Sincronização Concluída'),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total de registos: ${result.totalRecords}'),
+                    Text('Tempo: ${result.durationFormatted}'),
+                    const SizedBox(height: 8),
+                    Text(
+                      result.message,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = result.message;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isSyncing = false;
+        _errorMessage = 'Erro na sincronização: ${e.toString()}';
       });
     }
   }
@@ -102,8 +176,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
+                  // Mensagem de sincronização
+                  if (_isSyncing)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue[300]!),
+                      ),
+                      child: Column(
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 12),
+                          Text(
+                            _syncMessage ?? 'Sincronizando...',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.blue[700]),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // Erro
-                  if (_errorMessage != null)
+                  if (_errorMessage != null && !_isSyncing)
                     Container(
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 16),
@@ -129,6 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Username
                   TextFormField(
                     controller: _usernameController,
+                    enabled: !_isSyncing,
                     decoration: InputDecoration(
                       labelText: 'Username',
                       prefixIcon: const Icon(Icons.person_outline),
@@ -150,6 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Password
                   TextFormField(
                     controller: _passwordController,
+                    enabled: !_isSyncing,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       labelText: 'Password',
@@ -181,9 +280,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Botão
+                  // Botão Login
                   ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
+                    onPressed: (_isLoading || _isSyncing) ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -209,6 +308,32 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Botão Sincronizar
+                  OutlinedButton.icon(
+                    onPressed: (_isLoading || _isSyncing) ? null : _handleSync,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: Colors.blue[700]!),
+                    ),
+                    icon: Icon(
+                      Icons.sync,
+                      color: _isSyncing ? Colors.grey : Colors.blue[700],
+                    ),
+                    label: Text(
+                      'Sincronizar Dados',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _isSyncing ? Colors.grey : Colors.blue[700],
+                      ),
+                    ),
                   ),
 
                   // Dica DEBUG

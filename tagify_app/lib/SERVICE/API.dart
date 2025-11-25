@@ -59,6 +59,25 @@ class ApiService {
   // ARTIGOS
   // ============================================
 
+  Future<List<Artigo>> getAllArtigos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/artigos'),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+        return json.map((item) => Artigo.fromJson(item)).toList();
+      } else {
+        print('Erro: ${response.statusCode} - ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('Erro ao buscar artigos: $e');
+      return [];
+    }
+  }
+
   Future<Artigo?> getArtigoById(int id) async {
     try {
       final response = await http.get(
