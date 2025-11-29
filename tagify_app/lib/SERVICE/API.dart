@@ -4,9 +4,9 @@ import 'package:tagify_app/models/models.dart';
 
 class ApiService {
   // IMPORTANTE: 
-  // Telemóvel físico -> usar o IP do PC: http://127.0.0.1:8000
+  // Telemóvel físico -> usar o IP do PC: http://192.168.193.102:8000
   // Emulador Android: http://10.0.2.2:8000
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  static const String baseUrl = 'http://192.168.193.102:8000';
 
   // ============================================
   // AUTENTICAÇÃO
