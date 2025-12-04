@@ -5,13 +5,13 @@ import 'package:tagify_app/models/models.dart';
 import 'database_helper.dart';
 
 class ApiService {
-  // IMPORTANTE: Ajustar conforme necessário
-  // Telemóvel físico -> usar o IP do PC: http://192.168.8.95:8000
+  // IMPORTANTE: Ajustar conforme necessario
+  // Telemovel fisico -> usar o IP do PC: http://172.20.10.2:8000
   // Emulador Android: http://10.0.2.2:8000
-  static const String baseUrl = 'http://192.168.8.95:8000';
+  static const String baseUrl = 'http://172.20.10.2:8000';
 
   // ============================================
-  // AUTENTICAÇÃO (OFFLINE-FIRST)
+  // AUTENTICACAO (OFFLINE-FIRST)
   // ============================================
   
   /// Login que funciona OFFLINE usando base de dados local
@@ -21,20 +21,20 @@ class ApiService {
       final offlineResult = await _loginOffline(username, password);
       
       if (offlineResult.success) {
-        print('✅ Login offline bem-sucedido');
+        print('Login offline bem-sucedido');
         
-        // SEGUNDO: Tenta sincronizar com servidor (background, não bloqueia)
+        // SEGUNDO: Tenta sincronizar com servidor (background, nao bloqueia)
         _tryBackgroundSync(username, password);
         
         return offlineResult;
       }
       
       // Se falhou offline, tenta online (primeira vez ou sem dados locais)
-      print('⚠️ Login offline falhou, tentando online...');
+      print('Login offline falhou, tentando online...');
       return await _loginOnline(username, password);
       
     } catch (e) {
-      print('❌ Erro no login: $e');
+      print('Erro no login: $e');
       return LoginResponse(
         success: false,
         message: 'Erro ao fazer login: $e',
@@ -56,7 +56,7 @@ class ApiService {
       if (results.isEmpty) {
         return LoginResponse(
           success: false,
-          message: 'Utilizador não encontrado ou inativo (offline)',
+          message: 'Utilizador nao encontrado ou inativo (offline)',
         );
       }
 
@@ -81,7 +81,7 @@ class ApiService {
       print('Erro no login offline: $e');
       return LoginResponse(
         success: false,
-        message: 'Dados locais não disponíveis. Sincronize primeiro.',
+        message: 'Dados locais nao disponiveis. Sincronize primeiro.',
       );
     }
   }
@@ -89,7 +89,7 @@ class ApiService {
   /// Login ONLINE usando API
   Future<LoginResponse> _loginOnline(String username, String password) async {
     try {
-      print('🌐 Tentando login online...');
+      print('Tentando login online...');
       
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
@@ -117,10 +117,10 @@ class ApiService {
         );
       }
     } catch (e) {
-      print('❌ Erro no login online: $e');
+      print('Erro no login online: $e');
       return LoginResponse(
         success: false,
-        message: 'Sem conexão ao servidor. Use modo offline.',
+        message: 'Sem conexao ao servidor. Use modo offline.',
       );
     }
   }
@@ -136,71 +136,70 @@ class ApiService {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       
-      print('✅ Utilizador guardado localmente');
+      print('Utilizador guardado localmente');
     } catch (e) {
-      print('⚠️ Erro ao guardar utilizador: $e');
+      print('Erro ao guardar utilizador: $e');
     }
   }
 
-  /// Tenta sincronizar em background (não bloqueia o login)
+  /// Tenta sincronizar em background (nao bloqueia o login)
   void _tryBackgroundSync(String username, String password) async {
     try {
       await _loginOnline(username, password);
     } catch (e) {
-      // Ignora erros - é apenas tentativa em background
+      // Ignora erros - e apenas tentativa em background
       print('Background sync falhou (ignorado): $e');
     }
   }
 
   // ============================================
-  // HEALTH CHECK (CORRIGIDO - V3)
+  // HEALTH CHECK
   // ============================================
 
   Future<bool> healthCheck() async {
     try {
-      print('🏥 Testando conexão com $baseUrl/sync/tipos');
+      print('Testando conexao com $baseUrl/sync/tipos');
       final response = await http
           .get(Uri.parse('$baseUrl/sync/tipos'))
           .timeout(const Duration(seconds: 5));
       
-      print('📡 Status code: ${response.statusCode}');
+      print('Status code: ${response.statusCode}');
       
       if (response.statusCode == 200) {
-        print('✅ Servidor acessível!');
+        print('Servidor acessivel!');
         return true;
       }
       
-      print('⚠️ Servidor respondeu com código ${response.statusCode}');
+      print('Servidor respondeu com codigo ${response.statusCode}');
       return false;
     } catch (e) {
-      print('❌ Health check falhou: $e');
+      print('Health check falhou: $e');
       return false;
     }
   }
 
-  /// Verifica se o servidor está acessível
+  /// Verifica se o servidor esta acessivel
   Future<bool> isServerAvailable() async {
     return await healthCheck();
   }
 
   // ============================================
-  // ARTIGOS (OFFLINE-FIRST) - CORRIGIDO
+  // ARTIGOS (OFFLINE-FIRST)
   // ============================================
 
-  /// Busca artigos (OFFLINE primeiro, SEM background sync automático)
+  /// Busca artigos (OFFLINE primeiro, SEM background sync automatico)
   Future<List<Artigo>> getAllArtigos() async {
     try {
       // PRIMEIRO: Tenta buscar localmente
       final localArtigos = await _getArtigosOffline();
       
       if (localArtigos.isNotEmpty) {
-        print('✅ Carregados ${localArtigos.length} artigos do cache local');
-        // REMOVIDO: _tryUpdateArtigosBackground() - causava loop!
+        print('Carregados ${localArtigos.length} artigos do cache local');
         return localArtigos;
       }
       
-      // Se não há dados locais, tenta buscar online
-      print('⚠️ Sem dados locais, tentando online...');
+      // Se nao ha dados locais, tenta buscar online
+      print('Sem dados locais, tentando online...');
       return await _getArtigosOnline();
       
     } catch (e) {
@@ -233,7 +232,7 @@ class ApiService {
         final json = jsonDecode(utf8.decode(response.bodyBytes)) as List;
         final artigos = json.map((item) => Artigo.fromJson(item)).toList();
         
-        // Salva localmente para próxima vez
+        // Salva localmente para proxima vez
         await _saveArtigosLocally(artigos);
         
         return artigos;
@@ -262,9 +261,9 @@ class ApiService {
       }
       
       await batch.commit(noResult: true);
-      print('✅ ${artigos.length} artigos guardados localmente');
+      print('${artigos.length} artigos guardados localmente');
     } catch (e) {
-      print('⚠️ Erro ao guardar artigos: $e');
+      print('Erro ao guardar artigos: $e');
     }
   }
 
@@ -278,7 +277,7 @@ class ApiService {
       final artigo = await _getArtigoByIdOffline(id);
       if (artigo != null) return artigo;
       
-      // Se não encontrou, tenta online
+      // Se nao encontrou, tenta online
       return await _getArtigoByIdOnline(id);
     } catch (e) {
       print('Erro ao buscar artigo: $e');
@@ -320,7 +319,7 @@ class ApiService {
   }
 
   // ============================================
-  // ARTIGO POR CÓDIGO (OFFLINE-FIRST)
+  // ARTIGO POR CODIGO (OFFLINE-FIRST)
   // ============================================
 
   Future<Artigo?> getArtigoByCodigo(String codigo) async {
@@ -328,14 +327,14 @@ class ApiService {
       // Tenta offline primeiro
       final artigo = await _getArtigoByCodigoOffline(codigo);
       if (artigo != null) {
-        print('✅ Artigo encontrado offline: ${artigo.designacao}');
+        print('Artigo encontrado offline: ${artigo.designacao}');
         return artigo;
       }
       
-      // Se não encontrou, tenta online
+      // Se nao encontrou, tenta online
       return await _getArtigoByCodigoOnline(codigo);
     } catch (e) {
-      print('Erro ao buscar artigo por código: $e');
+      print('Erro ao buscar artigo por codigo: $e');
       return null;
     }
   }
@@ -373,7 +372,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('Erro ao buscar artigo por código online: $e');
+      print('Erro ao buscar artigo por codigo online: $e');
       return null;
     }
   }

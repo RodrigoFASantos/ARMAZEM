@@ -44,7 +44,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
         _isNFCAvailable = isAvailable;
         _statusMessage = isAvailable 
             ? 'Aproxime a etiqueta NFC' 
-            : 'NFC não disponível neste dispositivo';
+            : 'NFC nao disponivel neste dispositivo';
       });
 
       if (isAvailable) {
@@ -61,135 +61,173 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
 
   void _startNFCSession() {
     NfcManager.instance.startSession(
+      pollingOptions: {
+        NfcPollingOption.iso14443,
+        NfcPollingOption.iso15693,
+        NfcPollingOption.iso18092,
+      },
       onDiscovered: (NfcTag tag) async {
-        print('🔵 Tag NFC detectada: ${tag.data}');
+        print('Tag NFC detectada');
         
-        String? nfcId = _extractNFCId(tag);
-        
-        if (nfcId != null) {
-          await _searchArticle(nfcId);
-        } else {
+        try {
+          String? nfcId = _extractNFCId(tag);
+          
+          if (nfcId != null) {
+            await _searchArticle(nfcId);
+          } else {
+            if (mounted) {
+              _showErrorDialog(
+                'Erro ao ler NFC', 
+                'Nao foi possivel extrair o ID da tag'
+              );
+            }
+          }
+        } catch (e) {
+          print('Erro ao processar tag: $e');
           if (mounted) {
-            _showErrorDialog(
-              'Erro ao ler NFC', 
-              'Não foi possível extrair o ID da tag'
-            );
+            setState(() {
+              _statusMessage = 'Erro ao ler NFC';
+            });
           }
         }
       },
-      onError: (error) async {
-        print('❌ Erro NFC: $error');
-        if (mounted) {
-          setState(() {
-            _statusMessage = 'Erro ao ler NFC';
-          });
-        }
-        // Não retornar nada - só processar o erro
-      },
     );
 
-    print('🔵 Sessão NFC iniciada');
+    print('Sessao NFC iniciada');
   }
 
   void _stopNFCSession() {
     try {
       NfcManager.instance.stopSession();
-      print('🔵 Sessão NFC parada');
+      print('Sessao NFC parada');
     } catch (e) {
-      print('Erro ao parar sessão NFC: $e');
+      print('Erro ao parar sessao NFC: $e');
     }
   }
 
   String? _extractNFCId(NfcTag tag) {
     try {
-      // Tentar ler como NDEF primeiro
-      final ndef = Ndef.from(tag);
-      if (ndef != null && ndef.cachedMessage != null) {
-        final message = ndef.cachedMessage!;
-        if (message.records.isNotEmpty) {
-          // Ler o payload do primeiro record
-          var payload = message.records.first.payload;
-          
-          // Remover byte de controle de idioma se existir (NDEF Text Record)
-          if (payload.isNotEmpty && payload[0] == 0x02) {
-            // 0x02 = UTF-8, seguido de código de língua de 2 bytes
-            if (payload.length > 3) {
-              payload = payload.sublist(3);
+      // Converter tag.data para Map
+      final Map<String, dynamic> tagData = Map<String, dynamic>.from(tag.data as Map);
+      
+      print('Tag data keys: ${tagData.keys.toList()}');
+      
+      // Tentar ler NDEF primeiro (dados gravados na tag)
+      if (tagData.containsKey('ndef')) {
+        final ndefData = tagData['ndef'] as Map<String, dynamic>?;
+        if (ndefData != null && ndefData.containsKey('cachedMessage')) {
+          final cachedMessage = ndefData['cachedMessage'] as Map<String, dynamic>?;
+          if (cachedMessage != null && cachedMessage.containsKey('records')) {
+            final records = cachedMessage['records'] as List<dynamic>?;
+            if (records != null && records.isNotEmpty) {
+              final firstRecord = records.first as Map<String, dynamic>;
+              if (firstRecord.containsKey('payload')) {
+                final payload = firstRecord['payload'] as List<dynamic>;
+                // Converter payload para string (remover bytes de controle)
+                if (payload.length > 3) {
+                  final textBytes = payload.sublist(3);
+                  String text = String.fromCharCodes(
+                    textBytes.map((e) => e as int).toList()
+                  ).trim();
+                  print('NDEF Text: $text');
+                  return text;
+                }
+              }
             }
-          } else if (payload.isNotEmpty) {
-            // Se começar com outro byte de controle, tentar ler após o primeiro byte
-            payload = payload.sublist(1);
           }
-          
-          String text = String.fromCharCodes(payload).trim();
-          print('📝 NDEF Text: $text');
-          return text;
         }
       }
       
-      // Se não for NDEF, usar ID do hardware
-      // Tentar NfcA (tecnologia mais comum - ISO 14443-3A)
-      final nfcA = NfcA.from(tag);
-      if (nfcA != null && nfcA.identifier.isNotEmpty) {
-        String id = nfcA.identifier
-            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-            .join(':')
-            .toUpperCase();
-        print('🔑 NFC-A ID: $id');
-        return id;
-      }
-      
-      // Tentar NfcB
-      final nfcB = NfcB.from(tag);
-      if (nfcB != null && nfcB.identifier.isNotEmpty) {
-        String id = nfcB.identifier
-            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-            .join(':')
-            .toUpperCase();
-        print('🔑 NFC-B ID: $id');
-        return id;
-      }
-      
-      // Tentar NfcF
-      final nfcF = NfcF.from(tag);
-      if (nfcF != null && nfcF.identifier.isNotEmpty) {
-        String id = nfcF.identifier
-            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-            .join(':')
-            .toUpperCase();
-        print('🔑 NFC-F ID: $id');
-        return id;
-      }
-      
-      // Tentar NfcV
-      final nfcV = NfcV.from(tag);
-      if (nfcV != null && nfcV.identifier.isNotEmpty) {
-        String id = nfcV.identifier
-            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-            .join(':')
-            .toUpperCase();
-        print('🔑 NFC-V ID: $id');
-        return id;
-      }
-      
-      // Tentar extrair qualquer ID disponível dos dados brutos
-      if (tag.data.containsKey('nfca')) {
-        final data = tag.data['nfca'] as Map;
-        if (data.containsKey('identifier')) {
-          final id = (data['identifier'] as List)
-              .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+      // Tentar extrair ID do hardware (fallback)
+      // NfcA - mais comum
+      if (tagData.containsKey('nfca')) {
+        final nfcaData = tagData['nfca'] as Map<String, dynamic>?;
+        if (nfcaData != null && nfcaData.containsKey('identifier')) {
+          final identifier = nfcaData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
               .join(':')
               .toUpperCase();
-          print('🔑 Raw NFC-A ID: $id');
+          print('NFC-A ID: $id');
           return id;
         }
       }
       
-      print('⚠️ Não foi possível extrair ID da tag');
-      print('📋 Dados disponíveis: ${tag.data.keys}');
+      // NfcB
+      if (tagData.containsKey('nfcb')) {
+        final nfcbData = tagData['nfcb'] as Map<String, dynamic>?;
+        if (nfcbData != null && nfcbData.containsKey('identifier')) {
+          final identifier = nfcbData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('NFC-B ID: $id');
+          return id;
+        }
+      }
+      
+      // NfcF
+      if (tagData.containsKey('nfcf')) {
+        final nfcfData = tagData['nfcf'] as Map<String, dynamic>?;
+        if (nfcfData != null && nfcfData.containsKey('identifier')) {
+          final identifier = nfcfData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('NFC-F ID: $id');
+          return id;
+        }
+      }
+      
+      // NfcV
+      if (tagData.containsKey('nfcv')) {
+        final nfcvData = tagData['nfcv'] as Map<String, dynamic>?;
+        if (nfcvData != null && nfcvData.containsKey('identifier')) {
+          final identifier = nfcvData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('NFC-V ID: $id');
+          return id;
+        }
+      }
+      
+      // MiFare
+      if (tagData.containsKey('mifare')) {
+        final mifareData = tagData['mifare'] as Map<String, dynamic>?;
+        if (mifareData != null && mifareData.containsKey('identifier')) {
+          final identifier = mifareData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('MiFare ID: $id');
+          return id;
+        }
+      }
+      
+      // IsoDep
+      if (tagData.containsKey('isodep')) {
+        final isoDepData = tagData['isodep'] as Map<String, dynamic>?;
+        if (isoDepData != null && isoDepData.containsKey('identifier')) {
+          final identifier = isoDepData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('IsoDep ID: $id');
+          return id;
+        }
+      }
+      
+      print('Nao foi possivel extrair ID da tag');
+      print('Dados disponiveis: ${tagData.keys.toList()}');
       return null;
     } catch (e) {
-      print('❌ Erro ao extrair ID NFC: $e');
+      print('Erro ao extrair ID NFC: $e');
       return null;
     }
   }
@@ -202,7 +240,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
       _statusMessage = 'Procurando artigo...';
     });
 
-    print('🔍 Procurando artigo com código NFC: $nfcCode');
+    print('Procurando artigo com codigo NFC: $nfcCode');
 
     try {
       final artigo = await _apiService.getArtigoByCodigo(nfcCode);
@@ -215,18 +253,18 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
           ),
         );
       } else if (mounted) {
-        _showErrorDialog('Artigo não encontrado', 'Código NFC: $nfcCode');
+        _showErrorDialog('Artigo nao encontrado', 'Codigo NFC: $nfcCode');
         setState(() {
           _isSearching = false;
           _statusMessage = 'Aproxime a etiqueta NFC';
         });
       }
     } catch (e) {
-      print('❌ Erro ao buscar artigo: $e');
+      print('Erro ao buscar artigo: $e');
       if (mounted) {
         _showErrorDialog(
           'Erro na busca', 
-          'Não foi possível buscar o artigo.\n\n$e'
+          'Nao foi possivel buscar o artigo.\n\n$e'
         );
         setState(() {
           _isSearching = false;
@@ -267,7 +305,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Animação de ondas NFC
+            // Animacao de ondas NFC
             AnimatedBuilder(
               animation: _animationController,
               builder: (context, child) {
@@ -328,7 +366,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
                   const SizedBox(height: 16),
                   if (_isNFCAvailable)
                     const Text(
-                      '📲 Mantenha o dispositivo próximo\nà etiqueta NFC',
+                      'Mantenha o dispositivo proximo\na etiqueta NFC',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white70,
@@ -363,8 +401,8 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
                   const SizedBox(height: 8),
                   Text(
                     _isNFCAvailable 
-                        ? '✅ NFC Ativo e Pronto'
-                        : '⚠️ NFC Não Disponível',
+                        ? 'NFC Ativo e Pronto'
+                        : 'NFC Nao Disponivel',
                     style: TextStyle(
                       color: _isNFCAvailable ? Colors.green : Colors.orange,
                       fontWeight: FontWeight.bold,
@@ -374,8 +412,8 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
                   const SizedBox(height: 8),
                   Text(
                     _isNFCAvailable
-                        ? 'Aproxime uma etiqueta NFC para começar'
-                        : 'Verifique se o NFC está ativo\nnas definições do dispositivo',
+                        ? 'Aproxime uma etiqueta NFC para comecar'
+                        : 'Verifique se o NFC esta ativo\nnas definicoes do dispositivo',
                     style: const TextStyle(color: Colors.white70, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
