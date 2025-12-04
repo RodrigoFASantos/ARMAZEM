@@ -16,7 +16,8 @@ flutter emulators --launch <nome_emulador>
 # Depois correr a app:
 flutter run
 
-
+# Telemóvel
+flutter run -d 24333524702865
 
 
 # ESTRUTURA

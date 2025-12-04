@@ -1,43 +1,40 @@
 name: tagify_app
-description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+description: "Sistema de Gestão de Armazém - ARMAZÉM"
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
   sdk: ^3.9.2
 
-
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.2.0  # Para chamadas à API
-  provider: ^6.1.0  # Gestão de estado
-  cupertino_icons: ^1.0.8
-
-  # Base de Dados OFFLINE v
+  
+  # API e Networking
+  http: ^1.2.0
+  
+  # Gestão de Estado
+  provider: ^6.1.0
+  
+  # Base de Dados Offline
   sqflite: ^2.3.0
   path: ^1.8.3
-  #########################
-
-  # Câmara para Scanner
-  camera: ^0.11.0+2
-
-
-
-
-
-
+  
+  # Scanners
+  mobile_scanner: ^5.2.3  # QR Code e Barcode
+  camera: ^0.11.0+2       # Câmara para AR
+  nfc_manager: ^3.5.0     # NFC Scanner ← NOVO!
+  
+  # UI
+  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^5.0.0
-
 
 flutter:
   uses-material-design: true
   
-  # Assets para base de dados offline
   assets:
     - assets/sql/TABELAS.sql

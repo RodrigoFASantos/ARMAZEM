@@ -19,14 +19,33 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isSyncing = false;
   bool _obscurePassword = true;
+  bool _isServerOnline = false;
   String? _errorMessage;
   String? _syncMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkServerStatus();
+  }
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// Verifica se o servidor está acessível
+  Future<void> _checkServerStatus() async {
+    final isOnline = await _apiService.isServerAvailable();
+    setState(() => _isServerOnline = isOnline);
+    
+    if (isOnline) {
+      print('✅ Servidor online');
+    } else {
+      print('⚠️ Servidor offline - Modo offline ativado');
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -49,15 +68,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.success && response.utilizador != null) {
         if (mounted) {
+          final modoOffline = !_isServerOnline;
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Bem-vindo, ${response.utilizador!.nome}!'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 1),
+              content: Row(
+                children: [
+                  Icon(
+                    modoOffline ? Icons.offline_bolt : Icons.cloud_done,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      modoOffline
+                          ? 'Bem-vindo, ${response.utilizador!.nome}! (Modo Offline)'
+                          : 'Bem-vindo, ${response.utilizador!.nome}!',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: modoOffline ? Colors.orange : Colors.green,
+              duration: const Duration(seconds: 2),
             ),
           );
           
-          // Navega para a Home (scanner integrado)
+          // Navega para a Home
           Navigator.of(context).pushReplacementNamed('/home');
         }
       } else {
@@ -68,12 +104,22 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Erro ao conectar ao servidor';
+        _errorMessage = 'Erro ao fazer login: $e';
       });
     }
   }
 
   Future<void> _handleSync() async {
+    // Verifica se servidor está online
+    await _checkServerStatus();
+    
+    if (!_isServerOnline) {
+      setState(() {
+        _errorMessage = 'Servidor não está acessível. Verifique a conexão.';
+      });
+      return;
+    }
+
     setState(() {
       _isSyncing = true;
       _syncMessage = 'Iniciando sincronização...';
@@ -111,9 +157,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text('Total de registos: ${result.totalRecords}'),
                     Text('Tempo: ${result.durationFormatted}'),
                     const SizedBox(height: 8),
-                    Text(
-                      result.message,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    const Text(
+                      'Agora pode usar a app offline!',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
                   ],
                 ),
@@ -174,7 +223,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.grey[600],
                         ),
                   ),
-                  const SizedBox(height: 48),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Indicador de status do servidor
+                  _buildServerStatusIndicator(),
+                  
+                  const SizedBox(height: 32),
 
                   // Mensagem de sincronização
                   if (_isSyncing)
@@ -301,12 +356,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                   AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Text(
-                            'Entrar',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Entrar',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (!_isServerOnline) ...[
+                                const SizedBox(width: 8),
+                                const Icon(Icons.offline_bolt, size: 20),
+                              ],
+                            ],
                           ),
                   ),
 
@@ -320,18 +384,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      side: BorderSide(color: Colors.blue[700]!),
+                      side: BorderSide(
+                        color: _isServerOnline ? Colors.blue[700]! : Colors.grey,
+                      ),
                     ),
                     icon: Icon(
                       Icons.sync,
-                      color: _isSyncing ? Colors.grey : Colors.blue[700],
+                      color: _isSyncing
+                          ? Colors.grey
+                          : _isServerOnline
+                              ? Colors.blue[700]
+                              : Colors.grey,
                     ),
                     label: Text(
                       'Sincronizar Dados',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: _isSyncing ? Colors.grey : Colors.blue[700],
+                        color: _isSyncing
+                            ? Colors.grey
+                            : _isServerOnline
+                                ? Colors.blue[700]
+                                : Colors.grey,
                       ),
                     ),
                   ),
@@ -348,11 +422,85 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+                  
+                  // Instruções de uso offline
+                  if (!_isServerOnline)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange[300]!),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.orange[700]),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Modo Offline',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Use credenciais já sincronizadas. Para adicionar novos utilizadores, conecte ao servidor.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Widget que mostra o status do servidor
+  Widget _buildServerStatusIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _isServerOnline ? Colors.green[50] : Colors.orange[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _isServerOnline ? Colors.green[300]! : Colors.orange[300]!,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _isServerOnline ? Icons.cloud_done : Icons.cloud_off,
+            color: _isServerOnline ? Colors.green[700] : Colors.orange[700],
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _isServerOnline ? 'Servidor Online' : 'Servidor Offline',
+            style: TextStyle(
+              color: _isServerOnline ? Colors.green[700] : Colors.orange[700],
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }
