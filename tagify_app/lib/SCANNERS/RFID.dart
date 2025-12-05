@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../SERVICE/API.dart';
 import '../models/models.dart';
-import '../SCREENS/SCREENS_artigo_detail_screen.dart';
+import '../helpers/artigo_navigation_helper.dart';
 
 // NOTA: Para RFID funcionar no Zebra TC22, precisa configurar DataWedge
 // Documentação: https://techdocs.zebra.com/datawedge/
@@ -54,21 +54,6 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
         print('❌ Erro no canal RFID: $error');
       },
     );
-
-    // TODO: Configurar DataWedge via Intent
-    /*
-    try {
-      await platform.invokeMethod('configureDataWedge');
-      setState(() {
-        _statusMessage = 'RFID pronto';
-      });
-    } catch (e) {
-      print('Erro ao configurar DataWedge: $e');
-      setState(() {
-        _statusMessage = 'Erro ao inicializar RFID';
-      });
-    }
-    */
   }
 
   void _startScanning() {
@@ -78,11 +63,6 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
       _detectedTags.clear();
     });
 
-    // TODO: Enviar Intent para iniciar scan
-    /*
-    platform.invokeMethod('startRFIDScan');
-    */
-
     print('📡 Scanner RFID iniciado (simulado)');
   }
 
@@ -91,11 +71,6 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
       _isScanning = false;
       _statusMessage = 'Scan parado';
     });
-
-    // TODO: Enviar Intent para parar scan
-    /*
-    platform.invokeMethod('stopRFIDScan');
-    */
 
     print('📡 Scanner RFID parado (simulado)');
   }
@@ -124,11 +99,11 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
       final artigo = await _apiService.getArtigoByCodigo(rfidCode);
 
       if (artigo != null && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ArtigoDetailScreen(artigo: artigo),
-          ),
-        );
+        await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
+        
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       } else if (mounted) {
         _showErrorDialog('Artigo não encontrado', 'Tag RFID: $rfidCode');
         setState(() => _isSearching = false);
@@ -153,7 +128,7 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _startScanning(); // Reinicia scan
+                _startScanning();
               },
               child: const Text('OK'),
             ),
@@ -166,163 +141,252 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F23),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Scanner RFID'),
         backgroundColor: const Color(0xFFE63946),
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: RFIDWavePainter(_animationController.value),
-                  child: const SizedBox(
-                    width: 250,
-                    height: 250,
-                    child: Center(
-                      child: Icon(
-                        Icons.contactless,
-                        size: 120,
-                        color: Color(0xFFE63946),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 40),
-
-            if (_isSearching)
-              const Column(
-                children: [
-                  CircularProgressIndicator(color: Color(0xFFE63946)),
-                  SizedBox(height: 16),
-                  Text(
-                    'Procurando artigo...',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              )
-            else
-              Column(
-                children: [
-                  Text(
-                    _statusMessage,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_detectedTags.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 32),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Tags detectadas:',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFFE63946).withOpacity(0.1),
+              Colors.white,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animação RFID
+              AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: RFIDWavePainter(_animationController.value),
+                    child: SizedBox(
+                      width: 250,
+                      height: 250,
+                      child: Center(
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFE63946).withOpacity(0.1),
                           ),
-                          const SizedBox(height: 8),
-                          ..._detectedTags.map(
-                            (tag) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Text(
-                                tag,
-                                style: const TextStyle(
-                                  color: Color(0xFFE63946),
-                                  fontFamily: 'monospace',
+                          child: const Icon(
+                            Icons.contactless,
+                            size: 80,
+                            color: Color(0xFFE63946),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 40),
+
+              // Status
+              if (_isSearching)
+                Column(
+                  children: [
+                    const CircularProgressIndicator(
+                      color: Color(0xFFE63946),
+                      strokeWidth: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Procurando artigo...',
+                      style: TextStyle(
+                        color: Colors.grey[800],
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    Text(
+                      _statusMessage,
+                      style: TextStyle(
+                        color: Colors.grey[800],
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_detectedTags.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 32),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFE63946).withOpacity(0.3),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Tags detectadas:',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ..._detectedTags.map(
+                              (tag) => Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE63946).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE63946),
+                                      fontFamily: 'monospace',
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+
+              const SizedBox(height: 40),
+
+              // Botão Start/Stop
+              if (!_isSearching)
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE63946).withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton.icon(
+                    onPressed: _isScanning ? _stopScanning : _startScanning,
+                    icon: Icon(_isScanning ? Icons.stop : Icons.play_arrow, size: 24),
+                    label: Text(
+                      _isScanning ? 'PARAR SCAN' : 'INICIAR SCAN',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
                       ),
                     ),
-                ],
-              ),
-
-            const SizedBox(height: 40),
-
-            if (!_isSearching)
-              ElevatedButton.icon(
-                onPressed: _isScanning ? _stopScanning : _startScanning,
-                icon: Icon(_isScanning ? Icons.stop : Icons.play_arrow),
-                label: Text(_isScanning ? 'PARAR SCAN' : 'INICIAR SCAN'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE63946),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 40),
-
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange),
-              ),
-              child: const Column(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange, size: 32),
-                  SizedBox(height: 8),
-                  Text(
-                    'NOTA: Para ativar RFID no Zebra TC22',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE63946),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 18,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
                     ),
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    '1. Configurar DataWedge no dispositivo\n'
-                    '2. Criar canal nativo (MethodChannel)\n'
-                    '3. Adicionar código Kotlin/Java\n'
-                    '4. Descomentar código no ficheiro',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                    textAlign: TextAlign.center,
+                ),
+
+              const SizedBox(height: 40),
+
+              // Info Card
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 32),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.3),
+                    width: 2,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Colors.orange,
+                      size: 36,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'NOTA: Para ativar RFID no Zebra TC22',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '1. Configurar DataWedge no dispositivo\n'
+                      '2. Criar canal nativo (MethodChannel)\n'
+                      '3. Adicionar código Kotlin/Java\n'
+                      '4. Descomentar código no ficheiro',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// Painter para ondas RFID
 class RFIDWavePainter extends CustomPainter {
   final double progress;
 
@@ -338,7 +402,7 @@ class RFIDWavePainter extends CustomPainter {
       final opacity = 1.0 - ((progress + (i * 0.33)) % 1.0);
 
       final paint = Paint()
-        ..color = const Color(0xFFE63946).withOpacity(opacity * 0.5)
+        ..color = const Color(0xFFE63946).withOpacity(opacity * 0.4)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3;
 

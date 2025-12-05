@@ -3,7 +3,7 @@ import 'package:camera/camera.dart';
 import 'dart:io';
 import '../SERVICE/API.dart';
 import '../models/models.dart';
-import '../SCREENS/SCREENS_artigo_detail_screen.dart';
+import '../helpers/artigo_navigation_helper.dart';
 
 /// Scanner AR - Versão Simplificada
 /// 
@@ -206,11 +206,13 @@ class _ARScannerScreenState extends State<ARScannerScreen>
       final artigo = await _apiService.getArtigoByCodigo(code);
 
       if (artigo != null && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ArtigoDetailScreen(artigo: artigo),
-          ),
-        );
+        // ✨ USAR NAVEGAÇÃO INTELIGENTE
+        await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
+        
+        // Voltar para home após ver detalhes
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -6,9 +6,9 @@ import 'database_helper.dart';
 
 class ApiService {
   // IMPORTANTE: Ajustar conforme necessario
-  // Telemovel fisico -> usar o IP do PC: http://172.20.10.2:8000
+  // Telemovel fisico -> usar o IP do PC: http://192.168.8.95:8000
   // Emulador Android: http://10.0.2.2:8000
-  static const String baseUrl = 'http://172.20.10.2:8000';
+  static const String baseUrl = 'http://192.168.8.95:8000';
 
   // ============================================
   // AUTENTICACAO (OFFLINE-FIRST)
@@ -264,6 +264,100 @@ class ApiService {
       print('${artigos.length} artigos guardados localmente');
     } catch (e) {
       print('Erro ao guardar artigos: $e');
+    }
+  }
+
+  // ============================================
+  // EQUIPAMENTOS (OFFLINE-FIRST)
+  // ============================================
+
+  /// Busca equipamentos com estados (OFFLINE primeiro)
+  Future<List<Equipamento>> getAllEquipamentos() async {
+    try {
+      // PRIMEIRO: Tenta buscar localmente
+      final localEquipamentos = await _getEquipamentosOffline();
+      
+      if (localEquipamentos.isNotEmpty) {
+        print('Carregados ${localEquipamentos.length} equipamentos do cache local');
+        return localEquipamentos;
+      }
+      
+      // Se nao ha dados locais, tenta buscar online
+      print('Sem dados locais, tentando online...');
+      return await _getEquipamentosOnline();
+      
+    } catch (e) {
+      print('Erro ao buscar equipamentos: $e');
+      return [];
+    }
+  }
+
+  /// Busca equipamentos do SQLite local com JOIN para pegar estado
+  Future<List<Equipamento>> _getEquipamentosOffline() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      
+      // Query com JOIN para buscar estado
+      final results = await db.rawQuery('''
+        SELECT 
+          e.*,
+          a.Designacao as artigo_designacao,
+          est.Designacao as estado_designacao
+        FROM EQUIPAMENTO e
+        LEFT JOIN ARTIGO a ON e.ID_artigo = a.ID_artigo
+        LEFT JOIN ESTADO est ON e.ID_Estado = est.ID_Estado
+      ''');
+      
+      return results.map((row) => Equipamento.fromJson(row)).toList();
+    } catch (e) {
+      print('Erro ao buscar equipamentos offline: $e');
+      return [];
+    }
+  }
+
+  /// Busca equipamentos da API
+  Future<List<Equipamento>> _getEquipamentosOnline() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/equipamentos'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+        final equipamentos = json.map((item) => Equipamento.fromJson(item)).toList();
+        
+        return equipamentos;
+      } else {
+        print('Erro: ${response.statusCode} - ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('Erro ao buscar equipamentos online: $e');
+      return [];
+    }
+  }
+
+  /// Busca equipamento por ID do artigo
+  Future<Equipamento?> getEquipamentoByArtigoId(int idArtigo) async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      
+      final results = await db.rawQuery('''
+        SELECT 
+          e.*,
+          a.Designacao as artigo_designacao,
+          est.Designacao as estado_designacao
+        FROM EQUIPAMENTO e
+        LEFT JOIN ARTIGO a ON e.ID_artigo = a.ID_artigo
+        LEFT JOIN ESTADO est ON e.ID_Estado = est.ID_Estado
+        WHERE e.ID_artigo = ?
+      ''', [idArtigo]);
+      
+      if (results.isEmpty) return null;
+      return Equipamento.fromJson(results.first);
+    } catch (e) {
+      print('Erro ao buscar equipamento: $e');
+      return null;
     }
   }
 
