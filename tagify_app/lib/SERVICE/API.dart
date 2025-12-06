@@ -6,9 +6,9 @@ import 'database_helper.dart';
 
 class ApiService {
   // IMPORTANTE: Ajustar conforme necessario
-  // Telemovel fisico -> usar o IP do PC: http://192.168.8.95:8000
+  // Telemovel fisico -> usar o IP do PC: http://172.20.10.2:8000
   // Emulador Android: http://10.0.2.2:8000
-  static const String baseUrl = 'http://192.168.8.95:8000';
+  static const String baseUrl = 'http://172.20.10.2:8000';
 
   // ============================================
   // AUTENTICACAO (OFFLINE-FIRST)
@@ -316,26 +316,45 @@ class ApiService {
   }
 
   /// Busca equipamentos da API
-  Future<List<Equipamento>> _getEquipamentosOnline() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/equipamentos'))
-          .timeout(const Duration(seconds: 10));
+Future<List<Equipamento>> _getEquipamentosOnline() async {
+  try {
+    final response = await http
+        .get(Uri.parse('$baseUrl/sync/equipamentos'))
+        .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(utf8.decode(response.bodyBytes)) as List;
-        final equipamentos = json.map((item) => Equipamento.fromJson(item)).toList();
-        
-        return equipamentos;
-      } else {
-        print('Erro: ${response.statusCode} - ${response.body}');
-        return [];
-      }
-    } catch (e) {
-      print('Erro ao buscar equipamentos online: $e');
+    if (response.statusCode == 200) {
+      final json = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      final equipamentos =
+          json.map((item) => Equipamento.fromJson(item)).toList();
+
+      // (opcional) guardar localmente – ver ponto 3
+      // await _saveEquipamentosLocally(equipamentos);
+
+      return equipamentos;
+    } else {
+      print('Erro: ${response.statusCode} - ${response.body}');
       return [];
     }
+  } catch (e) {
+    print('Erro ao buscar equipamentos online: $e');
+    return [];
   }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   /// Busca equipamento por ID do artigo
   Future<Equipamento?> getEquipamentoByArtigoId(int idArtigo) async {

@@ -40,7 +40,7 @@ class Equipamento {
           : null,
       requerInspecao:
           json['Requer_inspecao'] == 1 || json['Requer_inspecao'] == true,
-      cicloInspecaoDias: json['Ciclo_inpecao_dias'],
+      cicloInspecaoDias: json['Ciclo_inspecao_dias'],
       artigoDesignacao: json['artigo_designacao'],
       estadoDesignacao: json['estado_designacao'],
     );
@@ -56,7 +56,7 @@ class Equipamento {
       'Modelo': modelo,
       'Data_aquisicao': dataAquisicao?.toIso8601String(),
       'Requer_inspecao': requerInspecao ? 1 : 0,
-      'Ciclo_inpecao_dias': cicloInspecaoDias,
+      'Ciclo_inspecao_dias': cicloInspecaoDias,
     };
   }
 

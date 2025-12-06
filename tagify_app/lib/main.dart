@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'SCANNERS/NFC.dart';
+import 'SCANNERS/RFID.dart';
 
 void main() {
   runApp(const MyApp());
@@ -22,6 +24,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/nfc': (context) => const NFCScannerScreen(),
+        '/rfid': (context) => const RFIDScannerScreen(),
       },
     );
   }

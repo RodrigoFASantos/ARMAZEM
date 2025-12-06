@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import '../SCANNERS/NFC.dart';
+import '../SCANNERS/RFID.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -8,51 +10,137 @@ class ScannerScreen extends StatefulWidget {
   State<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> {
+class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserver {
   CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
+  bool _isDisposed = false;
   ScanMode _currentMode = ScanMode.ar;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
-
-      _cameraController = CameraController(
-        cameras[0],
-        ResolutionPreset.high,
-        enableAudio: false,
-      );
-
-      await _cameraController!.initialize();
-      
-      if (mounted) {
-        setState(() => _isCameraInitialized = true);
-      }
-    } catch (e) {
-      print('Erro ao inicializar câmara: $e');
-    }
   }
 
   @override
   void dispose() {
-    _cameraController?.dispose();
+    _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _disposeCamera();
     super.dispose();
   }
 
+  /// Observa mudanças de ciclo de vida da app
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isDisposed) return;
+    
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _disposeCamera();
+    } else if (state == AppLifecycleState.resumed) {
+      _initializeCamera();
+    }
+  }
+
+  Future<void> _initializeCamera() async {
+    if (_isDisposed) return;
+    
+    try {
+      // Guarda lista de câmaras para reutilizar
+      _cameras ??= await availableCameras();
+      
+      if (_cameras == null || _cameras!.isEmpty) {
+        print('Nenhuma câmara disponível');
+        return;
+      }
+
+      // Cria novo controller
+      final controller = CameraController(
+        _cameras![0],
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+
+      await controller.initialize();
+      
+      if (_isDisposed) {
+        await controller.dispose();
+        return;
+      }
+
+      _cameraController = controller;
+      
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
+      }
+      
+      print('✅ Câmara inicializada');
+    } catch (e) {
+      print('❌ Erro ao inicializar câmara: $e');
+    }
+  }
+
+  Future<void> _disposeCamera() async {
+    if (_cameraController == null) return;
+    
+    final controller = _cameraController;
+    _cameraController = null;
+    
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
+    
+    try {
+      await controller?.dispose();
+      print('🔴 Câmara libertada');
+    } catch (e) {
+      print('Erro ao libertar câmara: $e');
+    }
+  }
+
+  /// Navega para ecrã externo LIBERTANDO a câmara completamente
+  Future<void> _navigateToScreen(Widget screen) async {
+    // IMPORTANTE: Libertar câmara ANTES de navegar (não apenas pausar!)
+    await _disposeCamera();
+    
+    if (!mounted) return;
+    
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+    
+    // Reinicializa câmara quando volta
+    if (mounted && !_isDisposed) {
+      await _initializeCamera();
+    }
+  }
+
   void _onScanModeChanged(ScanMode mode) {
+    // Se clicar em RFID ou NFC, navega para o ecrã dedicado
+    if (mode == ScanMode.rfid) {
+      _navigateToScreen(const RFIDScannerScreen());
+      return;
+    }
+    
+    if (mode == ScanMode.nfc) {
+      _navigateToScreen(const NFCScannerScreen());
+      return;
+    }
+    
     setState(() => _currentMode = mode);
     print('Modo alterado para: ${mode.name}');
   }
 
   void _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    if (_cameraController == null || 
+        !_cameraController!.value.isInitialized) {
       return;
     }
 
@@ -115,6 +203,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),
                 ),
+                child: Text(
+                  _getModeLabel(_currentMode),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ),
           ),
@@ -151,12 +247,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         label: 'RFID',
                         mode: ScanMode.rfid,
                         isActive: _currentMode == ScanMode.rfid,
+                        color: const Color(0xFFE63946),
                       ),
                       _buildModeButton(
                         icon: Icons.nfc,
                         label: 'NFC',
                         mode: ScanMode.nfc,
                         isActive: _currentMode == ScanMode.nfc,
+                        color: const Color(0xFFFF6B35),
                       ),
                       _buildModeButton(
                         icon: Icons.view_in_ar,
@@ -212,22 +310,40 @@ class _ScannerScreenState extends State<ScannerScreen> {
     );
   }
 
+  String _getModeLabel(ScanMode mode) {
+    switch (mode) {
+      case ScanMode.rfid:
+        return 'RFID Scanner';
+      case ScanMode.nfc:
+        return 'NFC Scanner';
+      case ScanMode.ar:
+        return 'Realidade Aumentada';
+      case ScanMode.qr:
+        return 'QR Code Scanner';
+      case ScanMode.barcode:
+        return 'Código de Barras';
+    }
+  }
+
   Widget _buildModeButton({
     required IconData icon,
     required String label,
     required ScanMode mode,
     required bool isActive,
+    Color? color,
   }) {
+    final activeColor = color ?? Colors.blue;
+    
     return GestureDetector(
       onTap: () => _onScanModeChanged(mode),
       child: Container(
         width: 60,
         height: 60,
         decoration: BoxDecoration(
-          color: isActive ? Colors.blue : Colors.white.withOpacity(0.3),
+          color: isActive ? activeColor : Colors.white.withOpacity(0.3),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? Colors.blue : Colors.white.withOpacity(0.5),
+            color: isActive ? activeColor : Colors.white.withOpacity(0.5),
             width: 2,
           ),
         ),
@@ -280,7 +396,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
       ),
     );
   }
-
 }
 
 // Modos de identificação

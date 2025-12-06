@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     db_port: Optional[str] = Field(default=None, alias="DB_PORT")
 
     app_env: str = Field(default="dev", alias="APP_ENV")
-    app_host: str = Field(default="192.168.8.95", alias="APP_HOST")
+    app_host: str = Field(default="172.20.10.2", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
 
     class Config:

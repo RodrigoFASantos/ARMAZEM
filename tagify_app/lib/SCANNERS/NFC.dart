@@ -16,6 +16,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
   final _apiService = ApiService();
   bool _isSearching = false;
   bool _isNFCAvailable = false;
+  bool _isSessionActive = false;
   String _statusMessage = 'Verificando NFC...';
   late AnimationController _animationController;
 
@@ -40,6 +41,8 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
     try {
       bool isAvailable = await NfcManager.instance.isAvailable();
       
+      if (!mounted) return;
+      
       setState(() {
         _isNFCAvailable = isAvailable;
         _statusMessage = isAvailable 
@@ -52,6 +55,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
       }
     } catch (e) {
       print('Erro ao verificar NFC: $e');
+      if (!mounted) return;
       setState(() {
         _isNFCAvailable = false;
         _statusMessage = 'Erro ao verificar NFC';
@@ -60,6 +64,8 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
   }
 
   void _startNFCSession() {
+    if (_isSessionActive) return;
+    
     NfcManager.instance.startSession(
       pollingOptions: {
         NfcPollingOption.iso14443,
@@ -68,6 +74,8 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
       },
       onDiscovered: (NfcTag tag) async {
         print('Tag NFC detectada');
+        
+        if (!mounted) return;
         
         try {
           String? nfcId = _extractNFCId(tag);
@@ -93,12 +101,17 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
       },
     );
 
+    _isSessionActive = true;
     print('Sessão NFC iniciada');
   }
 
+
   void _stopNFCSession() {
+    if (!_isSessionActive) return;
+    
     try {
       NfcManager.instance.stopSession();
+      _isSessionActive = false;
       print('Sessão NFC parada');
     } catch (e) {
       print('Erro ao parar sessão NFC: $e');
@@ -111,7 +124,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
       
       print('Tag data keys: ${tagData.keys.toList()}');
       
-      // Tentar ler NDEF primeiro
+      // Tentar ler NDEF primeiro (texto gravado na tag)
       if (tagData.containsKey('ndef')) {
         final ndefData = tagData['ndef'] as Map<String, dynamic>?;
         if (ndefData != null && ndefData.containsKey('cachedMessage')) {
@@ -123,6 +136,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
               if (firstRecord.containsKey('payload')) {
                 final payload = firstRecord['payload'] as List<dynamic>;
                 if (payload.length > 3) {
+                  // Ignora os primeiros 3 bytes (language code)
                   final textBytes = payload.sublist(3);
                   String text = String.fromCharCodes(
                     textBytes.map((e) => e as int).toList()
@@ -136,7 +150,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
         }
       }
       
-      // Tentar extrair ID do hardware (fallback)
+      // Fallback: extrair ID do hardware
       if (tagData.containsKey('nfca')) {
         final nfcaData = tagData['nfca'] as Map<String, dynamic>?;
         if (nfcaData != null && nfcaData.containsKey('identifier')) {
@@ -150,6 +164,48 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
         }
       }
       
+      // Tentar NFC-B
+      if (tagData.containsKey('nfcb')) {
+        final nfcbData = tagData['nfcb'] as Map<String, dynamic>?;
+        if (nfcbData != null && nfcbData.containsKey('identifier')) {
+          final identifier = nfcbData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('NFC-B ID: $id');
+          return id;
+        }
+      }
+      
+      // Tentar NFC-F
+      if (tagData.containsKey('nfcf')) {
+        final nfcfData = tagData['nfcf'] as Map<String, dynamic>?;
+        if (nfcfData != null && nfcfData.containsKey('identifier')) {
+          final identifier = nfcfData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('NFC-F ID: $id');
+          return id;
+        }
+      }
+      
+      // Tentar NFC-V (ISO 15693)
+      if (tagData.containsKey('nfcv')) {
+        final nfcvData = tagData['nfcv'] as Map<String, dynamic>?;
+        if (nfcvData != null && nfcvData.containsKey('identifier')) {
+          final identifier = nfcvData['identifier'] as List<dynamic>;
+          String id = identifier
+              .map((byte) => (byte as int).toRadixString(16).padLeft(2, '0'))
+              .join(':')
+              .toUpperCase();
+          print('NFC-V ID: $id');
+          return id;
+        }
+      }
+      
       return null;
     } catch (e) {
       print('Erro ao extrair ID NFC: $e');
@@ -158,7 +214,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
   }
 
   Future<void> _searchArticle(String nfcCode) async {
-    if (_isSearching) return;
+    if (_isSearching || !mounted) return;
 
     setState(() {
       _isSearching = true;
@@ -170,7 +226,9 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
     try {
       final artigo = await _apiService.getArtigoByCodigo(nfcCode);
 
-      if (artigo != null && mounted) {
+      if (!mounted) return;
+
+      if (artigo != null) {
         _stopNFCSession();
         
         await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
@@ -178,7 +236,7 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
         if (mounted) {
           Navigator.of(context).pop();
         }
-      } else if (mounted) {
+      } else {
         _showErrorDialog('Artigo não encontrado', 'Código NFC: $nfcCode');
         setState(() {
           _isSearching = false;
@@ -187,29 +245,31 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
       }
     } catch (e) {
       print('Erro ao buscar artigo: $e');
-      if (mounted) {
-        _showErrorDialog(
-          'Erro na busca', 
-          'Não foi possível buscar o artigo.\n\n$e'
-        );
-        setState(() {
-          _isSearching = false;
-          _statusMessage = 'Aproxime a etiqueta NFC';
-        });
-      }
+      if (!mounted) return;
+      
+      _showErrorDialog(
+        'Erro na busca', 
+        'Não foi possível buscar o artigo.\n\n$e'
+      );
+      setState(() {
+        _isSearching = false;
+        _statusMessage = 'Aproxime a etiqueta NFC';
+      });
     }
   }
 
   void _showErrorDialog(String title, String message) {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(title),
           content: Text(message),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('OK'),
             ),
           ],
@@ -252,34 +312,54 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
                     height: 220,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF6B35).withOpacity(
-                            0.3 * (1 - _animationController.value)
-                          ),
-                          blurRadius: 40 * _animationController.value,
-                          spreadRadius: 20 * _animationController.value,
-                        ),
-                      ],
+                      boxShadow: _isNFCAvailable && !_isSearching
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFFF6B35).withOpacity(
+                                  0.3 * (1 - _animationController.value)
+                                ),
+                                blurRadius: 40 * _animationController.value,
+                                spreadRadius: 20 * _animationController.value,
+                              ),
+                            ]
+                          : [],
                     ),
                     child: Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: const Color(0xFFFF6B35).withOpacity(0.1),
                       ),
-                      child: const Icon(
-                        Icons.nfc,
+                      child: Icon(
+                        _isNFCAvailable ? Icons.nfc : Icons.nfc_rounded,
                         size: 100,
-                        color: Color(0xFFFF6B35),
+                        color: _isNFCAvailable 
+                            ? const Color(0xFFFF6B35)
+                            : Colors.grey,
                       ),
                     ),
                   );
                 },
               ),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
 
-              // Status
+              // Mensagem de status
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  _statusMessage,
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Indicador de pesquisa
               if (_isSearching)
                 Column(
                   children: [
@@ -291,93 +371,37 @@ class _NFCScannerScreenState extends State<NFCScannerScreen>
                     Text(
                       'Procurando artigo...',
                       style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Column(
-                  children: [
-                    Text(
-                      _statusMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (_isNFCAvailable)
-                      Text(
-                        'Mantenha o dispositivo próximo\nà etiqueta NFC',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
-                        ),
-                      ),
-                  ],
-                ),
-
-              const SizedBox(height: 40),
-
-              // Info Card
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 32),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _isNFCAvailable 
-                        ? Colors.green.withOpacity(0.3)
-                        : Colors.orange.withOpacity(0.3),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      _isNFCAvailable ? Icons.check_circle : Icons.info_outline,
-                      color: _isNFCAvailable ? Colors.green : Colors.orange,
-                      size: 40,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _isNFCAvailable 
-                          ? 'NFC Ativo e Pronto'
-                          : 'NFC Não Disponível',
-                      style: TextStyle(
-                        color: _isNFCAvailable ? Colors.green : Colors.orange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _isNFCAvailable
-                          ? 'Aproxime uma etiqueta NFC para começar'
-                          : 'Verifique se o NFC está ativo\nnas definições do dispositivo',
-                      style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 14,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-              ),
+
+              // Instruções quando NFC não disponível
+              if (!_isNFCAvailable)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.grey[400],
+                        size: 48,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Verifique se o NFC está ativado\nnas definições do dispositivo.',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),

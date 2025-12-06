@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../SERVICE/API.dart';
 import '../models/models.dart';
 import '../helpers/artigo_navigation_helper.dart';
 
-// NOTA: Para RFID funcionar no Zebra TC22, precisa configurar DataWedge
-// Documentação: https://techdocs.zebra.com/datawedge/
-
+/// Scanner RFID para dispositivos Zebra TC22 com DataWedge
+/// 
+/// NOTA: Requer configuração do DataWedge no dispositivo Zebra.
+/// O MainActivity.kt configura automaticamente o perfil DataWedge.
+/// Documentação: https://techdocs.zebra.com/datawedge/
 class RFIDScannerScreen extends StatefulWidget {
   const RFIDScannerScreen({super.key});
 
@@ -19,12 +22,16 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
   final _apiService = ApiService();
   bool _isSearching = false;
   bool _isScanning = false;
-  String _statusMessage = 'Pronto para escanear';
+  bool _isRFIDAvailable = false;
+  String _statusMessage = 'A verificar dispositivo...';
   List<String> _detectedTags = [];
   late AnimationController _animationController;
 
-  static const platform = MethodChannel('com.armazem.rfid');
-  static const EventChannel scanChannel = EventChannel('com.armazem.rfid/scan');
+  // Canais de comunicação com código nativo
+  static const MethodChannel _methodChannel = MethodChannel('com.armazem.rfid');
+  static const EventChannel _eventChannel = EventChannel('com.armazem.rfid/scan');
+  
+  StreamSubscription<dynamic>? _scanSubscription;
 
   @override
   void initState() {
@@ -33,53 +40,128 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
-    _initializeRFID();
+    _checkRFIDAvailability();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     _stopScanning();
+    _scanSubscription?.cancel();
+    _scanSubscription = null;
     super.dispose();
   }
 
-  Future<void> _initializeRFID() async {
-    scanChannel.receiveBroadcastStream().listen(
+  /// Verifica se o dispositivo suporta RFID (Zebra com DataWedge)
+  Future<void> _checkRFIDAvailability() async {
+    try {
+      final bool isAvailable = await _methodChannel.invokeMethod('isAvailable');
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isRFIDAvailable = isAvailable;
+        _statusMessage = isAvailable 
+            ? 'Pronto para escanear' 
+            : 'RFID não disponível neste dispositivo';
+      });
+      
+      if (isAvailable) {
+        _initializeRFIDStream();
+      }
+    } on PlatformException catch (e) {
+      print('❌ Erro ao verificar RFID: ${e.message}');
+      if (!mounted) return;
+      setState(() {
+        _isRFIDAvailable = false;
+        _statusMessage = 'Erro ao verificar RFID';
+      });
+    } on MissingPluginException catch (e) {
+      print('❌ Plugin RFID não implementado: ${e.message}');
+      if (!mounted) return;
+      setState(() {
+        _isRFIDAvailable = false;
+        _statusMessage = 'Plugin RFID não configurado';
+      });
+    }
+  }
+
+  /// Inicializa o stream de eventos RFID
+  void _initializeRFIDStream() {
+    _scanSubscription?.cancel();
+    
+    _scanSubscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
-        if (event is String) {
+        if (!mounted) return;
+        if (event is String && event.isNotEmpty) {
           _onRFIDDetected(event);
         }
       },
       onError: (dynamic error) {
-        print('❌ Erro no canal RFID: $error');
+        print('❌ Erro no stream RFID: $error');
+        if (!mounted) return;
+        setState(() {
+          _statusMessage = 'Erro na comunicação RFID';
+        });
       },
+      cancelOnError: false,
     );
+    
+    print('📡 Stream RFID inicializado');
   }
 
-  void _startScanning() {
-    setState(() {
-      _isScanning = true;
-      _statusMessage = 'Escaneando...';
-      _detectedTags.clear();
-    });
-
-    print('📡 Scanner RFID iniciado (simulado)');
+  /// Inicia o scan RFID
+  Future<void> _startScanning() async {
+    if (!_isRFIDAvailable) return;
+    
+    try {
+      await _methodChannel.invokeMethod('startScan');
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isScanning = true;
+        _statusMessage = 'Escaneando...';
+        _detectedTags.clear();
+      });
+      
+      print('📡 Scanner RFID iniciado');
+    } on PlatformException catch (e) {
+      print('❌ Erro ao iniciar scan: ${e.message}');
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = 'Erro ao iniciar scan';
+      });
+    }
   }
 
-  void _stopScanning() {
+  /// Para o scan RFID
+  Future<void> _stopScanning() async {
+    try {
+      await _methodChannel.invokeMethod('stopScan');
+    } on PlatformException catch (e) {
+      print('❌ Erro ao parar scan: ${e.message}');
+    }
+    
+    if (!mounted) return;
+    
     setState(() {
       _isScanning = false;
-      _statusMessage = 'Scan parado';
+      if (_statusMessage == 'Escaneando...') {
+        _statusMessage = 'Scan parado';
+      }
     });
-
-    print('📡 Scanner RFID parado (simulado)');
+    
+    print('📡 Scanner RFID parado');
   }
 
+  /// Callback quando uma tag RFID é detectada
   void _onRFIDDetected(String rfidTag) async {
-    if (_isSearching) return;
+    if (_isSearching || !mounted) return;
 
     print('📡 Tag RFID detectada: $rfidTag');
 
+    // Adiciona à lista de tags detectadas (sem duplicados)
     if (!_detectedTags.contains(rfidTag)) {
       setState(() {
         _detectedTags.add(rfidTag);
@@ -89,46 +171,66 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
     await _searchArticle(rfidTag);
   }
 
+  /// Pesquisa artigo pelo código RFID
   Future<void> _searchArticle(String rfidCode) async {
-    if (_isSearching) return;
+    if (_isSearching || !mounted) return;
 
-    setState(() => _isSearching = true);
-    _stopScanning();
+    setState(() {
+      _isSearching = true;
+      _statusMessage = 'Procurando artigo...';
+    });
+    
+    await _stopScanning();
 
     try {
       final artigo = await _apiService.getArtigoByCodigo(rfidCode);
 
-      if (artigo != null && mounted) {
+      if (!mounted) return;
+
+      if (artigo != null) {
         await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
         
         if (mounted) {
           Navigator.of(context).pop();
         }
-      } else if (mounted) {
+      } else {
         _showErrorDialog('Artigo não encontrado', 'Tag RFID: $rfidCode');
-        setState(() => _isSearching = false);
+        setState(() {
+          _isSearching = false;
+          _statusMessage = 'Pronto para escanear';
+        });
       }
     } catch (e) {
       print('❌ Erro ao buscar artigo: $e');
-      if (mounted) {
-        _showErrorDialog('Erro na busca', 'Não foi possível buscar o artigo.\n\n$e');
-        setState(() => _isSearching = false);
-      }
+      if (!mounted) return;
+      
+      _showErrorDialog(
+        'Erro na busca', 
+        'Não foi possível buscar o artigo.\n\n$e'
+      );
+      setState(() {
+        _isSearching = false;
+        _statusMessage = 'Pronto para escanear';
+      });
     }
   }
 
   void _showErrorDialog(String title, String message) {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(title),
           content: Text(message),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                _startScanning();
+                Navigator.of(dialogContext).pop();
+                if (mounted && _isRFIDAvailable) {
+                  _startScanning();
+                }
               },
               child: const Text('OK'),
             ),
@@ -168,7 +270,9 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
                 animation: _animationController,
                 builder: (context, child) {
                   return CustomPaint(
-                    painter: RFIDWavePainter(_animationController.value),
+                    painter: RFIDWavePainter(
+                      _isScanning ? _animationController.value : 0,
+                    ),
                     child: SizedBox(
                       width: 250,
                       height: 250,
@@ -180,10 +284,14 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
                             shape: BoxShape.circle,
                             color: const Color(0xFFE63946).withOpacity(0.1),
                           ),
-                          child: const Icon(
-                            Icons.contactless,
+                          child: Icon(
+                            _isRFIDAvailable 
+                                ? Icons.contactless 
+                                : Icons.portable_wifi_off,
                             size: 80,
-                            color: Color(0xFFE63946),
+                            color: _isRFIDAvailable 
+                                ? const Color(0xFFE63946)
+                                : Colors.grey,
                           ),
                         ),
                       ),
@@ -192,9 +300,22 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
                 },
               ),
 
+              const SizedBox(height: 24),
+              
+              // Mensagem de status
+              Text(
+                _statusMessage,
+                style: TextStyle(
+                  color: Colors.grey[700],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
               const SizedBox(height: 40),
 
-              // Status
+              // Status de pesquisa ou tags detectadas
               if (_isSearching)
                 Column(
                   children: [
@@ -213,80 +334,66 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
                     ),
                   ],
                 )
-              else
-                Column(
-                  children: [
-                    Text(
-                      _statusMessage,
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+              else if (_detectedTags.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFE63946).withOpacity(0.3),
                     ),
-                    const SizedBox(height: 16),
-                    if (_detectedTags.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 32),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFE63946).withOpacity(0.3),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Tags detectadas:',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ..._detectedTags.map(
-                              (tag) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE63946).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE63946),
-                                      fontFamily: 'monospace',
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Tags detectadas:',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 12),
+                      ..._detectedTags.map(
+                        (tag) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE63946).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              tag,
+                              style: const TextStyle(
+                                color: Color(0xFFE63946),
+                                fontFamily: 'monospace',
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
               const SizedBox(height: 40),
 
               // Botão Start/Stop
-              if (!_isSearching)
+              if (!_isSearching && _isRFIDAvailable)
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
@@ -300,7 +407,10 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
                   ),
                   child: ElevatedButton.icon(
                     onPressed: _isScanning ? _stopScanning : _startScanning,
-                    icon: Icon(_isScanning ? Icons.stop : Icons.play_arrow, size: 24),
+                    icon: Icon(
+                      _isScanning ? Icons.stop : Icons.play_arrow, 
+                      size: 24,
+                    ),
                     label: Text(
                       _isScanning ? 'PARAR SCAN' : 'INICIAR SCAN',
                       style: const TextStyle(
@@ -323,61 +433,31 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
                     ),
                   ),
                 ),
-
-              const SizedBox(height: 40),
-
-              // Info Card
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 32),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.orange.withOpacity(0.3),
-                    width: 2,
+              
+              // Mensagem quando RFID não disponível
+              if (!_isRFIDAvailable)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.grey[400],
+                        size: 48,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Este dispositivo não suporta RFID.\n'
+                        'Use um dispositivo Zebra com DataWedge.',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: Colors.orange,
-                      size: 36,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'NOTA: Para ativar RFID no Zebra TC22',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '1. Configurar DataWedge no dispositivo\n'
-                      '2. Criar canal nativo (MethodChannel)\n'
-                      '3. Adicionar código Kotlin/Java\n'
-                      '4. Descomentar código no ficheiro',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 13,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -386,7 +466,7 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
   }
 }
 
-// Painter para ondas RFID
+/// Painter para ondas RFID animadas
 class RFIDWavePainter extends CustomPainter {
   final double progress;
 
@@ -394,6 +474,8 @@ class RFIDWavePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (progress == 0) return; // Não desenha ondas se não está a escanear
+    
     final center = Offset(size.width / 2, size.height / 2);
     final maxRadius = size.width / 2;
 
@@ -411,5 +493,6 @@ class RFIDWavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(RFIDWavePainter oldDelegate) => true;
+  bool shouldRepaint(RFIDWavePainter oldDelegate) => 
+      oldDelegate.progress != progress;
 }

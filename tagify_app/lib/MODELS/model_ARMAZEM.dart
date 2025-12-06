@@ -12,7 +12,7 @@ class Armazem {
   factory Armazem.fromJson(Map<String, dynamic> json) {
     return Armazem(
       id: json['ID_armazem'],
-      descricao: json['Descricao'],
+      descricao: json['Descricao'] ?? '',
       localizacao: json['Localizacao'],
     );
   }
@@ -24,4 +24,6 @@ class Armazem {
       'Localizacao': localizacao,
     };
   }
+
+
 }

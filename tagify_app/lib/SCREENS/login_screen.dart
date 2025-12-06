@@ -145,25 +145,18 @@ class _LoginScreenState extends State<LoginScreen> {
               return AlertDialog(
                 title: const Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 32),
+                    Icon(Icons.check_circle, color: Colors.green, size: 15),
                     SizedBox(width: 12),
-                    Text('Sincronização Concluída'),
+                    Text('Sincronizado'),
                   ],
                 ),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total de registos: ${result.totalRecords}'),
+                    Text('Artigos: ${result.totalRecords}'),
                     Text('Tempo: ${result.durationFormatted}'),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Agora pode usar a app offline!',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
                   ],
                 ),
                 actions: [
@@ -209,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'ARMAZÉM',
+                    'RLSEE',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -227,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   
                   // Indicador de status do servidor
-                  _buildServerStatusIndicator(),
+                  //_buildServerStatusIndicator(),
                   
                   const SizedBox(height: 32),
 
@@ -410,18 +403,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  // Dica DEBUG
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24),
-                    child: Text(
-                      'Teste: rodrigo / 1234',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
+            
                   
                   // Instruções de uso offline
                   if (!_isServerOnline)
@@ -471,7 +453,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
+/*
   /// Widget que mostra o status do servidor
   Widget _buildServerStatusIndicator() {
     return Container(
@@ -503,5 +485,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
-  }
+  }*/
 }

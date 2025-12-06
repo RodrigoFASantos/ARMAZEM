@@ -5,7 +5,7 @@ Script de teste para verificar endpoints de sincronização
 import requests
 import json
 
-BASE_URL = "http://192.168.8.95:8000"
+BASE_URL = "http://172.20.10.2:8000"
 
 def test_endpoint(endpoint):
     """Testa um endpoint e mostra o resultado"""

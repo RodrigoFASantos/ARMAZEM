@@ -83,6 +83,12 @@ CREATE TABLE IF NOT EXISTS MOVIMENTOS (
     Data_mov TEXT NOT NULL,
     Qtd_entrada REAL DEFAULT 0,
     Qtd_saida REAL DEFAULT 0,
+    NPrateleira INTEGER,
+    DPrateleira TEXT,
+    NCorredor INTEGER,
+    DCorredor TEXT,
+    Zona INTEGER,
+    Rack INTEGER,
     FOREIGN KEY (ID_artigo) REFERENCES ARTIGO(ID_artigo),
     FOREIGN KEY (ID_armazem) REFERENCES ARMAZEM(ID_armazem)
 );

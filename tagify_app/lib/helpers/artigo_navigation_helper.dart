@@ -5,231 +5,138 @@ import '../screens/equipamento_detail_screen.dart';
 import '../screens/materia_prima_detail_screen.dart';
 import '../screens/produto_detail_screen.dart';
 
-/// Helper para navegação inteligente entre as telas de detalhes de artigos
-/// Determina automaticamente qual tela usar baseado no tipo de artigo
+/// Helper para navegação inteligente baseada no tipo de artigo
 class ArtigoNavigationHelper {
   
-  /// Navega para a tela de detalhes apropriada baseando-se no tipo de artigo
+  /// Navega para o ecrã de detalhe apropriado com base no tipo do artigo
   static Future<void> navigateToArtigoDetail(
     BuildContext context,
     Artigo artigo,
   ) async {
-    // Verificar se tem equipamento associado
-    final equipamento = await _buscarEquipamento(artigo.id);
+    final db = DatabaseHelper.instance;
     
-    if (equipamento != null) {
-      // É EQUIPAMENTO
-      _navigateToEquipamento(context, artigo, equipamento);
-    } else {
-      // Determinar se é Matéria-Prima ou Produto baseado no tipo
-      final tipoDesignacao = artigo.tipo?.designacao?.toLowerCase() ?? '';
+    // Determinar tipo do artigo
+    final tipoId = artigo.idTipo;
+    final tipoDesignacao = artigo.tipo?.designacao?.toLowerCase() ?? '';
+    
+    // Verificar se é equipamento (tem registro na tabela EQUIPAMENTO)
+    final equipamentoData = await db.getEquipamentoComEstado(artigo.id);
+    
+    if (equipamentoData != null) {
+      // É um equipamento
+      final equipamento = Equipamento.fromJson(equipamentoData);
       
-      if (tipoDesignacao.contains('matéria') || 
-          tipoDesignacao.contains('materia') ||
-          tipoDesignacao.contains('prima') ||
-          artigo.idTipo == 1) {
-        // É MATÉRIA-PRIMA
-        _navigateToMateriaPrima(context, artigo);
-      } else {
-        // É PRODUTO (caso padrão)
-        final dataProduzido = await _buscarDataProducao(artigo.id);
-        _navigateToProduto(context, artigo, dataProduzido);
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EquipamentoDetailScreen(
+              artigo: artigo,
+              equipamento: equipamento,
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    
+    // Verificar tipo por designação ou ID
+    if (_isMateriaPrima(tipoId, tipoDesignacao)) {
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MateriaPrimaDetailScreen(artigo: artigo),
+          ),
+        );
+      }
+    } else if (_isProduto(tipoId, tipoDesignacao)) {
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProdutoDetailScreen(artigo: artigo),
+          ),
+        );
+      }
+    } else {
+      // Default: mostrar como matéria-prima
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MateriaPrimaDetailScreen(artigo: artigo),
+          ),
+        );
       }
     }
   }
   
-  /// Navega para tela de equipamento
-  static void _navigateToEquipamento(
-    BuildContext context,
-    Artigo artigo,
-    Equipamento equipamento,
-  ) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EquipamentoDetailScreen(
-          artigo: artigo,
-          equipamento: equipamento,
-        ),
-      ),
-    );
-  }
-  
-  /// Navega para tela de matéria-prima
-  static void _navigateToMateriaPrima(
-    BuildContext context,
-    Artigo artigo,
-  ) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MateriaPrimaDetailScreen(
-          artigo: artigo,
-        ),
-      ),
-    );
-  }
-  
-  /// Navega para tela de produto
-  static void _navigateToProduto(
-    BuildContext context,
-    Artigo artigo,
-    DateTime? dataProduzido,
-  ) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProdutoDetailScreen(
-          artigo: artigo,
-          dataProduzido: dataProduzido,
-        ),
-      ),
-    );
-  }
-  
-  /// Busca equipamento associado ao artigo
-  static Future<Equipamento?> _buscarEquipamento(int idArtigo) async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      final result = await db.query(
-        'EQUIPAMENTO',
-        where: 'ID_artigo = ?',
-        whereArgs: [idArtigo],
-      );
-      
-      if (result.isEmpty) return null;
-      return Equipamento.fromJson(result.first);
-    } catch (e) {
-      print('Erro ao buscar equipamento: $e');
-      return null;
+  /// Verifica se é matéria-prima
+  static bool _isMateriaPrima(int? tipoId, String tipoDesignacao) {
+    // Verificar por designação
+    if (tipoDesignacao.contains('materia') ||
+        tipoDesignacao.contains('matéria') ||
+        tipoDesignacao.contains('prima') ||
+        tipoDesignacao.contains('raw') ||
+        tipoDesignacao.contains('material')) {
+      return true;
     }
+    
+    // Verificar por ID (ajustar conforme a tua base de dados)
+    // Exemplo: tipo 1 = matéria-prima
+    if (tipoId == 1) return true;
+    
+    return false;
   }
   
-  /// Busca data de produção do artigo (pode ser do primeiro movimento de entrada)
-  static Future<DateTime?> _buscarDataProducao(int idArtigo) async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      final result = await db.query(
-        'MOVIMENTOS',
-        where: 'ID_artigo = ? AND Qtd_entrada > 0',
-        whereArgs: [idArtigo],
-        orderBy: 'Data_mov ASC',
-        limit: 1,
-      );
-      
-      if (result.isEmpty) return null;
-      
-      final dataStr = result.first['Data_mov'] as String;
-      return DateTime.parse(dataStr);
-    } catch (e) {
-      print('Erro ao buscar data de produção: $e');
-      return null;
+  /// Verifica se é produto acabado
+  static bool _isProduto(int? tipoId, String tipoDesignacao) {
+    // Verificar por designação
+    if (tipoDesignacao.contains('produto') ||
+        tipoDesignacao.contains('acabado') ||
+        tipoDesignacao.contains('final') ||
+        tipoDesignacao.contains('product') ||
+        tipoDesignacao.contains('finished')) {
+      return true;
     }
-  }
-}
-
-// =============================================================================
-// EXEMPLOS DE USO
-// =============================================================================
-
-/* 
-// EXEMPLO 1: Uso em lista de artigos
-class ArtigoListItem extends StatelessWidget {
-  final Artigo artigo;
-  
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      title: Text(artigo.designacao),
-      onTap: () {
-        // Navega automaticamente para a tela correta
-        ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
-      },
-    );
-  }
-}
-
-// EXEMPLO 2: Uso após escanear código
-Future<void> _handleScanResult(String codigo) async {
-  final db = await DatabaseHelper.instance.database;
-  
-  // Buscar artigo pelo código
-  final result = await db.query(
-    'ARTIGO',
-    where: 'Cod_bar = ? OR Cod_NFC = ? OR Cod_RFID = ?',
-    whereArgs: [codigo, codigo, codigo],
-  );
-  
-  if (result.isEmpty) {
-    // Artigo não encontrado
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Artigo não encontrado')),
-    );
-    return;
+    
+    // Verificar por ID (ajustar conforme a tua base de dados)
+    // Exemplo: tipo 2 = produto acabado
+    if (tipoId == 2) return true;
+    
+    return false;
   }
   
-  // Converter para objeto Artigo
-  final artigo = Artigo.fromJson(result.first);
+  /// Retorna o ícone apropriado para o tipo de artigo
+  static IconData getArtigoIcon(Artigo artigo) {
+    final tipoDesignacao = artigo.tipo?.designacao?.toLowerCase() ?? '';
+    
+    if (tipoDesignacao.contains('equipamento') ||
+        tipoDesignacao.contains('equipment')) {
+      return Icons.build;
+    } else if (_isMateriaPrima(artigo.idTipo, tipoDesignacao)) {
+      return Icons.inventory_2;
+    } else if (_isProduto(artigo.idTipo, tipoDesignacao)) {
+      return Icons.shopping_bag;
+    }
+    
+    return Icons.category;
+  }
   
-  // Navegar para detalhes (escolhe automaticamente a tela correta)
-  ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
-}
-
-// EXEMPLO 3: Uso em grid de artigos
-class ArtigoGridItem extends StatelessWidget {
-  final Artigo artigo;
-  
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo),
-      child: Card(
-        child: Column(
-          children: [
-            // Imagem
-            if (artigo.imagem != null)
-              Image.network(artigo.imagem!, height: 100),
-            // Nome
-            Text(artigo.designacao),
-          ],
-        ),
-      ),
-    );
+  /// Retorna a cor apropriada para o tipo de artigo
+  static Color getArtigoColor(Artigo artigo) {
+    final tipoDesignacao = artigo.tipo?.designacao?.toLowerCase() ?? '';
+    
+    if (tipoDesignacao.contains('equipamento') ||
+        tipoDesignacao.contains('equipment')) {
+      return Colors.orange;
+    } else if (_isMateriaPrima(artigo.idTipo, tipoDesignacao)) {
+      return Colors.blue;
+    } else if (_isProduto(artigo.idTipo, tipoDesignacao)) {
+      return Colors.green;
+    }
+    
+    return Colors.grey;
   }
 }
-
-// EXEMPLO 4: Navegação manual para tipo específico (caso precise)
-void _navigateManually(BuildContext context, Artigo artigo) {
-  // Forçar navegação para equipamento
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => EquipamentoDetailScreen(
-        artigo: artigo,
-        equipamento: null, // Pode ser null
-      ),
-    ),
-  );
-  
-  // Forçar navegação para matéria-prima
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => MateriaPrimaDetailScreen(
-        artigo: artigo,
-      ),
-    ),
-  );
-  
-  // Forçar navegação para produto
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ProdutoDetailScreen(
-        artigo: artigo,
-        dataProduzido: DateTime.now(),
-      ),
-    ),
-  );
-}
-*/

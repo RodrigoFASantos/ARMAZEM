@@ -4,6 +4,7 @@ import '../models/models.dart';
 import 'equipamento_detail_screen.dart';
 import 'produto_detail_screen.dart';
 import 'materia_prima_detail_screen.dart';
+import 'home_screen.dart';
 
 // Classe auxiliar para combinar Artigo com Equipamento
 class ArtigoComEquipamento {
@@ -102,16 +103,21 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
   void _showFilters() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
         return Container(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               const Text(
                 'Filtros',
                 style: TextStyle(
@@ -182,6 +188,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
               ),
             ],
           ),
+          ),
         );
       },
     );
@@ -192,6 +199,13 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
       _itensFiltrados = _itens.where((item) {
         return item.equipamento?.idEstado == idEstado;
       }).toList();
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _itensFiltrados = _itens;
+      _searchController.clear();
     });
   }
 
@@ -232,6 +246,14 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     }
   }
 
+  void _handleBottomNavigation(int index) {
+    if (index == 1) {
+      // Navegar para Câmara (voltar para Home)
+      Navigator.of(context).pop();
+    }
+    // Se index == 0, já estamos no Armazém
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -239,46 +261,60 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Barra de pesquisa no topo
+            // Header com pesquisa
             Container(
-              padding: const EdgeInsets.all(16),
               color: Colors.white,
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  // Botão de filtros (roda dentada)
+                  // Ícone de Filtros
                   IconButton(
-                    icon: const Icon(Icons.settings, size: 28),
                     onPressed: _showFilters,
-                    color: Colors.grey[700],
+                    icon: const Icon(Icons.filter_list),
+                    tooltip: 'Filtros',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
-                  
                   const SizedBox(width: 8),
-                  
+                  // Ícone de Limpar Filtros
+                  IconButton(
+                    onPressed: _clearFilters,
+                    icon: const Icon(Icons.filter_list_off),
+                    tooltip: 'Limpar filtros',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 12),
                   // Barra de pesquisa
                   Expanded(
                     child: TextField(
                       controller: _searchController,
                       onChanged: _onSearch,
                       decoration: InputDecoration(
-                        hintText: 'Pesquisar...',
-                        border: InputBorder.none,
-                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        hintText: 'Pesquisar artigos...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _onSearch('');
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       ),
                     ),
-                  ),
-                  
-                  // Botão de pesquisa (lupa)
-                  IconButton(
-                    icon: const Icon(Icons.search, size: 28),
-                    onPressed: () => _onSearch(_searchController.text),
-                    color: Colors.grey[700],
                   ),
                 ],
               ),
             ),
-            
-            // Divisor
-            Divider(height: 1, color: Colors.grey[300]),
             
             // Lista de itens
             Expanded(
@@ -291,7 +327,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
                             children: [
                               Icon(Icons.error_outline, 
                                    size: 64, 
-                                   color: Colors.grey[400]),
+                                   color: Colors.red[300]),
                               const SizedBox(height: 16),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -341,26 +377,20 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
         ),
       ),
       
-      // Barra inferior com navegação (igual à home)
+      // Bottom navbar igual à home: Armazém (esquerda), Câmara (direita)
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1, // ArmazÃ©m está selecionado
-        onTap: (index) {
-          if (index == 0) {
-            // Voltar para CÃ¢mara (Home)
-            Navigator.of(context).pop();
-          }
-          // Se index == 1, já estamos no Armazém
-        },
-        selectedItemColor: Colors.amber[800],
+        currentIndex: 0, // Armazém está selecionado
+        onTap: _handleBottomNavigation,
+        selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey[600],
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt, size: 28),
-            label: 'Câmara',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.warehouse, size: 28),
             label: 'Armazém',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera_alt, size: 28),
+            label: 'Câmara',
           ),
         ],
       ),
@@ -375,15 +405,15 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     if (item.equipamento != null) {
       // É equipamento - aplicar cor baseada no estado
       switch (item.equipamento!.idEstado) {
-        case 1: // Operacional
+        case 1: // Operacional - VERDE
           backgroundColor = Colors.green[50]!;
           borderColor = Colors.green[300];
           break;
-        case 2: // Em Manutenção
-          backgroundColor = Colors.orange[50]!;
-          borderColor = Colors.orange[300];
+        case 2: // Em Manutenção - AMARELO
+          backgroundColor = Colors.yellow[50]!;
+          borderColor = Colors.yellow[600];
           break;
-        case 3: // Avariado
+        case 3: // Avariado - VERMELHO
           backgroundColor = Colors.red[50]!;
           borderColor = Colors.red[300];
           break;
@@ -395,6 +425,12 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
       // Produto ou matéria-prima - cinzento
       backgroundColor = Colors.grey[50]!;
       borderColor = Colors.grey[300];
+    }
+    
+    // Obter nome do armazém (primeira localização disponível)
+    String? armazemNome;
+    if (item.artigo.localizacoes != null && item.artigo.localizacoes!.isNotEmpty) {
+      armazemNome = item.artigo.localizacoes!.first.armazem;
     }
     
     return Card(
@@ -413,7 +449,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Ícone do item
+              // Ícone/Imagem do item
               Container(
                 width: 60,
                 height: 60,
@@ -421,7 +457,18 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: _getItemIcon(item),
+                child: item.artigo.imagem != null && item.artigo.imagem!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          item.artigo.imagem!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _getItemIcon(item);
+                          },
+                        ),
+                      )
+                    : _getItemIcon(item),
               ),
               
               const SizedBox(width: 12),
@@ -444,12 +491,13 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
                     const SizedBox(height: 4),
                     
                     // Referência
-                    if (item.artigo.referencia != null)
+                    if (item.artigo.referencia != null && item.artigo.referencia!.isNotEmpty)
                       Text(
                         'Referência: ${item.artigo.referencia}',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     
@@ -457,6 +505,16 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
                     if (item.artigo.familia != null)
                       Text(
                         'Família: ${item.artigo.familia!.designacao}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    
+                    // Armazém
+                    if (armazemNome != null)
+                      Text(
+                        'Armazém: $armazemNome',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey[700],
@@ -525,11 +583,11 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
 
   Color _getEstadoColor(int? idEstado) {
     switch (idEstado) {
-      case 1: // Operacional
+      case 1: // Operacional - VERDE
         return Colors.green[700]!;
-      case 2: // Em Manutenção
-        return Colors.orange[700]!;
-      case 3: // Avariado
+      case 2: // Em Manutenção - AMARELO
+        return Colors.yellow[700]!;
+      case 3: // Avariado - VERMELHO
         return Colors.red[700]!;
       default:
         return Colors.grey[700]!;

@@ -1,7 +1,8 @@
 -- Schema SQLite para ARMAZEM (Base de Dados Offline)
+-- VERSÃO 3.0 - Com campos de localização detalhada
 
 -- Tabela: Utilizador
-CREATE TABLE IF NOT EXISTS UTILIZADORES (
+CREATE TABLE IF NOT EXISTS UTILIZADOR (
     ID_utilizador INTEGER PRIMARY KEY AUTOINCREMENT,
     Nome TEXT NOT NULL,
     Email TEXT NOT NULL UNIQUE,
@@ -10,7 +11,6 @@ CREATE TABLE IF NOT EXISTS UTILIZADORES (
     Ativo INTEGER DEFAULT 1
 );
 
--- Índice para login rápido
 CREATE INDEX IF NOT EXISTS idx_utilizador_email ON UTILIZADOR(Email);
 CREATE INDEX IF NOT EXISTS idx_utilizador_username ON UTILIZADOR(Username);
 
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS ESTADO (
     Designacao TEXT NOT NULL
 );
 
--- Tabela: Armazem
+-- Tabela: Armazem (COM NOVOS CAMPOS DE LOCALIZAÇÃO)
 CREATE TABLE IF NOT EXISTS ARMAZEM (
     ID_armazem INTEGER PRIMARY KEY,
     Descricao TEXT NOT NULL,
@@ -49,12 +49,11 @@ CREATE TABLE IF NOT EXISTS ARTIGO (
     Imagem TEXT,
     Cod_bar TEXT,
     Cod_NFC TEXT,
-    Cod_RFID TEXT,
+    Cod_RFID TEXT
     FOREIGN KEY (ID_tipo) REFERENCES TIPO(ID_tipo),
     FOREIGN KEY (ID_familia) REFERENCES FAMILIA(ID_familia)
 );
 
--- Índices para pesquisa rápida por código
 CREATE INDEX IF NOT EXISTS idx_artigo_cod_bar ON ARTIGO(Cod_bar);
 CREATE INDEX IF NOT EXISTS idx_artigo_cod_nfc ON ARTIGO(Cod_NFC);
 CREATE INDEX IF NOT EXISTS idx_artigo_cod_rfid ON ARTIGO(Cod_RFID);
@@ -83,11 +82,16 @@ CREATE TABLE IF NOT EXISTS MOVIMENTOS (
     Data_mov TEXT NOT NULL,
     Qtd_entrada REAL DEFAULT 0,
     Qtd_saida REAL DEFAULT 0,
+    NPrateleira INTEGER,
+    DPrateleira TEXT,
+    NCorredor INTEGER,
+    DCorredor TEXT,
+    Zona INTEGER,
+    Rack INTEGER
     FOREIGN KEY (ID_artigo) REFERENCES ARTIGO(ID_artigo),
     FOREIGN KEY (ID_armazem) REFERENCES ARMAZEM(ID_armazem)
 );
 
--- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_movimentos_artigo ON MOVIMENTOS(ID_artigo);
 CREATE INDEX IF NOT EXISTS idx_movimentos_armazem ON MOVIMENTOS(ID_armazem);
 CREATE INDEX IF NOT EXISTS idx_movimentos_data ON MOVIMENTOS(Data_mov);

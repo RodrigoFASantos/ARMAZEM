@@ -6,3 +6,4 @@ export '../models/model_EQUIPAMENTO.dart';
 export '../models/model_FAMILIA.dart';
 export '../models/model_MOVIMENTO.dart';
 export '../models/model_TIPO.dart';
+export '../models/model_ESTADO.dart';
