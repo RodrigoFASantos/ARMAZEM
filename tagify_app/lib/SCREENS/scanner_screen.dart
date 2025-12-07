@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../SCANNERS/NFC.dart';
 import '../SCANNERS/RFID.dart';
+import '../SCANNERS/AR.dart'; // ← NOVO!
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -123,7 +124,12 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   }
 
   void _onScanModeChanged(ScanMode mode) {
-    // Se clicar em RFID ou NFC, navega para o ecrã dedicado
+    // ✅ AGORA AR TAMBÉM NAVEGA PARA ECRÃ DEDICADO!
+    if (mode == ScanMode.ar) {
+      _navigateToScreen(const ARScannerScreen());
+      return;
+    }
+    
     if (mode == ScanMode.rfid) {
       _navigateToScreen(const RFIDScannerScreen());
       return;

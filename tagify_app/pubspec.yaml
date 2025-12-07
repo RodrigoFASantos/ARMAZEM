@@ -25,6 +25,11 @@ dependencies:
   camera: ^0.11.0+2       # Câmara para AR
   nfc_manager: ^4.1.1     # NFC Scanner
   
+  # ML e Reconhecimento de Imagem (!)
+  google_mlkit_object_detection: ^0.12.0
+  image: ^4.2.0          # Processamento de imagem
+  path_provider: ^2.1.2   # Para guardar imagens temporárias
+  
   # UI
   cupertino_icons: ^1.0.8
 
@@ -34,8 +39,11 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   
 
+
+
 flutter:
   uses-material-design: true
   
   assets:
     - assets/sql/TABELAS.sql
+    - assets/images/       # Para imagens de referência

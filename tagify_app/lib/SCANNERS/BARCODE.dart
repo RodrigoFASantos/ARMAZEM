@@ -12,9 +12,23 @@ class BarcodeScannerScreen extends StatefulWidget {
 }
 
 class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
+  // Formatos de códigos de barras lineares permitidos
+  static const List<BarcodeFormat> _allowedFormats = [
+    BarcodeFormat.code128,
+    BarcodeFormat.code39,
+    BarcodeFormat.code93,
+    BarcodeFormat.ean13,
+    BarcodeFormat.ean8,
+    BarcodeFormat.upcA,
+    BarcodeFormat.upcE,
+    BarcodeFormat.itf,
+    BarcodeFormat.codabar,
+  ];
+
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     facing: CameraFacing.back,
+    formats: _allowedFormats,
   );
   
   final _apiService = ApiService();
@@ -26,6 +40,23 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     super.dispose();
   }
 
+  /// Verifica se o formato é um código de barras linear (NÃO é QR Code)
+  bool _isValidBarcodeFormat(BarcodeFormat? format) {
+    if (format == null) return false;
+    
+    // REJEITAR explicitamente QR Code e outros 2D
+    if (format == BarcodeFormat.qrCode ||
+        format == BarcodeFormat.aztec ||
+        format == BarcodeFormat.dataMatrix ||
+        format == BarcodeFormat.pdf417) {
+      print('⚠️ Formato rejeitado: $format (não é código de barras linear)');
+      return false;
+    }
+    
+    // Verificar se está na lista de permitidos
+    return _allowedFormats.contains(format);
+  }
+
   void _onBarcodeDetected(BarcodeCapture capture) async {
     if (_isSearching) return;
 
@@ -33,21 +64,26 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     
     for (final barcode in barcodes) {
       final String? code = barcode.rawValue;
+      final BarcodeFormat? format = barcode.format;
+      
+      // VERIFICAÇÃO EXTRA: Ignorar se não for código de barras linear
+      if (!_isValidBarcodeFormat(format)) {
+        print('🚫 Ignorado: $code (formato: $format)');
+        continue; // Ignora e continua a procurar
+      }
       
       if (code != null && code.isNotEmpty) {
         setState(() => _isSearching = true);
         _controller.stop();
 
-        print('📦 Código de Barras detectado: $code');
+        print('📦 Código de Barras detectado: $code (formato: $format)');
 
         try {
           final artigo = await _apiService.getArtigoByCodigo(code);
 
           if (artigo != null && mounted) {
-            // ✨ USAR NAVEGAÇÃO INTELIGENTE
             await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
             
-            // Voltar para home após ver detalhes
             if (mounted) {
               Navigator.of(context).pop();
             }

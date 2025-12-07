@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSyncing = false;
   bool _obscurePassword = true;
   bool _isServerOnline = false;
+  bool _hasSynced = false; // ✅ NOVO: Indica se já sincronizou
   String? _errorMessage;
   String? _syncMessage;
 
@@ -135,38 +136,35 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
 
-      setState(() => _isSyncing = false);
+      setState(() {
+        _isSyncing = false;
+        _syncMessage = null;
+      });
 
       if (result.success) {
+        // ✅ ALTERADO: Marca que sincronizou (botão fica verde)
+        setState(() {
+          _hasSynced = true;
+        });
+        
+        // ✅ ALTERADO: Apenas SnackBar em vez de Dialog
         if (mounted) {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 15),
-                    SizedBox(width: 12),
-                    Text('Sincronizado'),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Artigos: ${result.totalRecords}'),
-                    Text('Tempo: ${result.durationFormatted}'),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Sincronizado! ${result.totalRecords} registos em ${result.durationFormatted}',
+                    ),
                   ),
                 ],
-              );
-            },
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
           );
         }
       } else {
@@ -177,6 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() {
         _isSyncing = false;
+        _syncMessage = null;
         _errorMessage = 'Erro na sincronização: ${e.toString()}';
       });
     }
@@ -210,57 +209,60 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sistema de Gestão',
+                    'Sistema de Informação',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: Colors.grey[600],
                         ),
                   ),
                   
-                  const SizedBox(height: 16),
-                  
-                  // Indicador de status do servidor
-                  //_buildServerStatusIndicator(),
-                  
                   const SizedBox(height: 32),
 
                   // Mensagem de sincronização
-                  if (_isSyncing)
+                  if (_isSyncing && _syncMessage != null)
                     Container(
-                      padding: const EdgeInsets.all(16),
                       margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue[300]!),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue[200]!),
                       ),
-                      child: Column(
+                      child: Row(
                         children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 12),
-                          Text(
-                            _syncMessage ?? 'Sincronizando...',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.blue[700]),
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              _syncMessage!,
+                              style: TextStyle(color: Colors.blue[700]),
+                            ),
                           ),
                         ],
                       ),
                     ),
 
-                  // Erro
-                  if (_errorMessage != null && !_isSyncing)
+                  // Mensagem de erro
+                  if (_errorMessage != null)
                     Container(
-                      padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.red[50],
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red[300]!),
+                        border: Border.all(color: Colors.red[200]!),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.error_outline, color: Colors.red[700]),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _errorMessage!,
@@ -369,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Botão Sincronizar
+                  // ✅ Botão Sincronizar - AZUL antes, VERDE depois
                   OutlinedButton.icon(
                     onPressed: (_isLoading || _isSyncing) ? null : _handleSync,
                     style: OutlinedButton.styleFrom(
@@ -378,33 +380,45 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       side: BorderSide(
-                        color: _isServerOnline ? Colors.blue[700]! : Colors.grey,
+                        color: _isSyncing
+                            ? Colors.grey
+                            : _hasSynced
+                                ? Colors.green  // ✅ VERDE depois de sincronizar
+                                : _isServerOnline
+                                    ? Colors.blue  // ✅ AZUL antes de sincronizar
+                                    : Colors.grey,
+                        width: 2,
                       ),
+                      backgroundColor: _hasSynced 
+                          ? Colors.green[50]  // Fundo verde claro depois de sincronizar
+                          : null,
                     ),
                     icon: Icon(
-                      Icons.sync,
+                      _hasSynced ? Icons.check_circle : Icons.sync,
                       color: _isSyncing
                           ? Colors.grey
-                          : _isServerOnline
-                              ? Colors.blue[700]
-                              : Colors.grey,
+                          : _hasSynced
+                              ? Colors.green  // ✅ VERDE depois de sincronizar
+                              : _isServerOnline
+                                  ? Colors.blue  // ✅ AZUL antes de sincronizar
+                                  : Colors.grey,
                     ),
                     label: Text(
-                      'Sincronizar Dados',
+                      _hasSynced ? 'Dados Sincronizados' : 'Sincronizar Dados',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: _isSyncing
                             ? Colors.grey
-                            : _isServerOnline
-                                ? Colors.blue[700]
-                                : Colors.grey,
+                            : _hasSynced
+                                ? Colors.green  // ✅ VERDE depois de sincronizar
+                                : _isServerOnline
+                                    ? Colors.blue  // ✅ AZUL antes de sincronizar
+                                    : Colors.grey,
                       ),
                     ),
                   ),
 
-            
-                  
                   // Instruções de uso offline
                   if (!_isServerOnline)
                     Padding(
@@ -453,37 +467,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-/*
-  /// Widget que mostra o status do servidor
-  Widget _buildServerStatusIndicator() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: _isServerOnline ? Colors.green[50] : Colors.orange[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: _isServerOnline ? Colors.green[300]! : Colors.orange[300]!,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _isServerOnline ? Icons.cloud_done : Icons.cloud_off,
-            color: _isServerOnline ? Colors.green[700] : Colors.orange[700],
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _isServerOnline ? 'Servidor Online' : 'Servidor Offline',
-            style: TextStyle(
-              color: _isServerOnline ? Colors.green[700] : Colors.orange[700],
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }*/
 }

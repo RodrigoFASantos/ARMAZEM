@@ -5,6 +5,7 @@ import '../SERVICE/API.dart';
 import '../models/models.dart';
 import '../helpers/artigo_navigation_helper.dart';
 import 'armazem_screen.dart';
+import '../SCANNERS/AR.dart';
 
 enum ScanMethod { rfid, nfc, ar, barcode, qrcode }
 
@@ -22,8 +23,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isCameraInitialized = false;
   bool _isSearching = false;
   bool _isDisposed = false;
-  bool _isSwitching = false; // NOVO: Flag para evitar múltiplas transições
-  ScanMethod _selectedMethod = ScanMethod.ar;
+  bool _isSwitching = false;
+  
+  // ✅ ALTERADO: Agora inicia com BARCODE por defeito
+  ScanMethod _selectedMethod = ScanMethod.barcode;
   int _selectedBottomIndex = 1;
   
   final _apiService = ApiService();
@@ -32,7 +35,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeCamera();
+    // ✅ ALTERADO: Inicia com MobileScanner (para barcode)
+    _initializeMobileScanner();
   }
 
   @override
@@ -50,12 +54,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       _disposeAllCameras();
     } else if (state == AppLifecycleState.resumed) {
-      // Reinicializa a câmara correta com base no modo atual
       _reinitializeCurrentScanner();
     }
   }
 
-  /// Reinicializa o scanner correto com base no modo selecionado
   Future<void> _reinitializeCurrentScanner() async {
     if (_selectedMethod == ScanMethod.qrcode || _selectedMethod == ScanMethod.barcode) {
       await _initializeMobileScanner();
@@ -64,7 +66,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Liberta TODAS as câmaras (CameraController e MobileScanner)
   Future<void> _disposeAllCameras() async {
     final cameraController = _cameraController;
     _cameraController = null;
@@ -79,15 +80,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     
     try {
+      // ✅ Para o MobileScanner antes de fazer dispose
+      if (mobileScannerController != null) {
+        await mobileScannerController.stop();
+        await Future.delayed(const Duration(milliseconds: 100));
+        await mobileScannerController.dispose();
+      }
+      
       await cameraController?.dispose();
-      await mobileScannerController?.dispose();
       print('🔴 Câmaras libertadas');
     } catch (e) {
       print('Erro ao libertar câmaras: $e');
     }
   }
 
-  /// Liberta apenas o CameraController (biblioteca camera)
   Future<void> _disposeCameraController() async {
     final controller = _cameraController;
     _cameraController = null;
@@ -106,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Liberta apenas o MobileScannerController
   Future<void> _disposeMobileScannerController() async {
     final controller = _mobileScannerController;
     _mobileScannerController = null;
@@ -117,6 +122,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     
     try {
+      // ✅ Para a câmara antes de fazer dispose
+      await controller.stop();
+      await Future.delayed(const Duration(milliseconds: 100));
       await controller.dispose();
       print('🔴 MobileScannerController libertado');
     } catch (e) {
@@ -124,7 +132,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Inicializa o CameraController (para modo AR)
   Future<void> _initializeCamera() async {
     if (_isDisposed) return;
     
@@ -164,23 +171,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Inicializa o MobileScannerController (para QR/Barcode)
   Future<void> _initializeMobileScanner() async {
     if (_isDisposed) return;
+    
+    // ✅ Garante que o controller anterior foi libertado
+    if (_mobileScannerController != null) {
+      print('⚠️ MobileScannerController já existe, a libertar primeiro...');
+      await _disposeMobileScannerController();
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
     
     print('📷 A criar MobileScannerController...');
     
     try {
-      _mobileScannerController = MobileScannerController(
+      final controller = MobileScannerController(
         detectionSpeed: DetectionSpeed.noDuplicates,
         facing: CameraFacing.back,
         returnImage: false,
       );
       
-      print('📷 MobileScannerController criado, a aguardar...');
+      // ✅ Aguarda que o controller esteja realmente pronto
+      await controller.start();
       
-      // Aguarda um momento para garantir inicialização
-      await Future.delayed(const Duration(milliseconds: 200));
+      print('📷 MobileScannerController iniciado, a aguardar...');
+      
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (_isDisposed) {
+        await controller.dispose();
+        return;
+      }
+      
+      _mobileScannerController = controller;
       
       if (mounted) {
         setState(() {});
@@ -188,19 +210,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (e) {
       print('❌ Erro ao inicializar MobileScanner: $e');
+      
+      // ✅ Tenta novamente após um delay
+      if (mounted && !_isDisposed) {
+        print('🔄 A tentar reinicializar MobileScanner...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        try {
+          _mobileScannerController = MobileScannerController(
+            detectionSpeed: DetectionSpeed.noDuplicates,
+            facing: CameraFacing.back,
+            returnImage: false,
+          );
+          
+          if (mounted) {
+            setState(() {});
+            print('✅ MobileScannerController reinicializado com sucesso');
+          }
+        } catch (e2) {
+          print('❌ Segunda tentativa falhou: $e2');
+        }
+      }
     }
   }
 
-  /// CORRIGIDO: Gestão correta da transição entre scanners
   Future<void> _handleScanMethodChange(ScanMethod method) async {
     if (method == _selectedMethod || _isSwitching) return;
 
-    // Marca que estamos a mudar de scanner
     setState(() {
       _isSwitching = true;
     });
 
-    // NFC e RFID abrem páginas dedicadas
+    // NFC, RFID e AR abrem páginas dedicadas
     if (method == ScanMethod.nfc) {
       setState(() => _isSwitching = false);
       _navigateToExternalScanner('/nfc');
@@ -209,11 +250,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() => _isSwitching = false);
       _navigateToExternalScanner('/rfid');
       return;
+    } else if (method == ScanMethod.ar) {
+      setState(() => _isSwitching = false);
+      _navigateToARScanner();
+      return;
     }
 
     final previousMethod = _selectedMethod;
     
-    // Atualiza o método selecionado
     setState(() {
       _selectedMethod = method;
     });
@@ -224,14 +268,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           (method == ScanMethod.qrcode || method == ScanMethod.barcode)) {
         print('🔄 Transição: AR -> ${method.name}');
         
-        // 1. PRIMEIRO: Libertar CameraController completamente
         await _disposeCameraController();
         
-        // 2. Pausa para libertar recursos do hardware (aumentado para TC22)
         print('⏳ A aguardar libertação do hardware...');
         await Future.delayed(const Duration(milliseconds: 500));
         
-        // 3. DEPOIS: Inicializar MobileScanner
         await _initializeMobileScanner();
       }
       // TRANSIÇÃO: QR/Barcode -> AR
@@ -239,22 +280,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                method == ScanMethod.ar) {
         print('🔄 Transição: ${previousMethod.name} -> AR');
         
-        // 1. PRIMEIRO: Libertar MobileScannerController
         await _disposeMobileScannerController();
         
-        // 2. Pausa para libertar recursos (aumentado para TC22)
         print('⏳ A aguardar libertação do hardware...');
         await Future.delayed(const Duration(milliseconds: 500));
         
-        // 3. DEPOIS: Inicializar CameraController
         await _initializeCamera();
       }
-      // TRANSIÇÃO: QR <-> Barcode (mesmo tipo de scanner, só muda overlay)
+      // TRANSIÇÃO: QR <-> Barcode (mesmo tipo de scanner)
       else if ((previousMethod == ScanMethod.qrcode && method == ScanMethod.barcode) ||
                (previousMethod == ScanMethod.barcode && method == ScanMethod.qrcode)) {
         print('🔄 Transição: ${previousMethod.name} -> ${method.name} (mesmo scanner)');
-        // Não precisa reinicializar - ambos usam MobileScanner
-        // Apenas atualiza a UI (overlay diferente)
+        // Não precisa fazer nada, apenas muda o overlay
       }
     } finally {
       if (mounted) {
@@ -265,259 +302,186 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Navega para scanner externo (NFC/RFID) LIBERTANDO a câmara
   Future<void> _navigateToExternalScanner(String route) async {
     await _disposeAllCameras();
     
     if (!mounted) return;
     
-    await Navigator.pushNamed(context, route);
+    await Navigator.of(context).pushNamed(route);
     
+    // ✅ CORRIGIDO: Aguarda mais tempo para libertar recursos da câmara
     if (mounted && !_isDisposed) {
-      setState(() => _selectedMethod = ScanMethod.ar);
-      await _initializeCamera();
+      print('🔄 A voltar do scanner externo, aguardando libertação de recursos...');
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // Força recriação do MobileScanner
+      setState(() {
+        _mobileScannerController = null;
+      });
+      
+      await Future.delayed(const Duration(milliseconds: 200));
+      await _reinitializeCurrentScanner();
+    }
+  }
+
+  Future<void> _navigateToARScanner() async {
+    await _disposeAllCameras();
+    
+    if (!mounted) return;
+    
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ARScannerScreen()),
+    );
+    
+    // ✅ CORRIGIDO: Aguarda mais tempo para libertar recursos da câmara
+    if (mounted && !_isDisposed) {
+      print('🔄 A voltar do AR, aguardando libertação de recursos...');
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // Força recriação do MobileScanner
+      setState(() {
+        _mobileScannerController = null;
+      });
+      
+      await Future.delayed(const Duration(milliseconds: 200));
+      await _reinitializeCurrentScanner();
     }
   }
 
   void _onBarcodeDetected(BarcodeCapture capture) async {
     if (_isSearching) return;
-
-    final List<Barcode> barcodes = capture.barcodes;
     
-    for (final barcode in barcodes) {
-      final String? code = barcode.rawValue;
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+    
+    final code = barcodes.first.rawValue;
+    if (code == null || code.isEmpty) return;
+    
+    setState(() => _isSearching = true);
+    
+    try {
+      final artigo = await _apiService.getArtigoByCodigo(code);
       
-      if (code != null && code.isNotEmpty) {
-        setState(() => _isSearching = true);
-        _mobileScannerController?.stop();
-
-        print('📱 Código detectado: $code');
-
-        try {
-          final artigo = await _apiService.getArtigoByCodigo(code);
-
-          if (artigo != null && mounted) {
-            await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
-            
-            if (mounted) {
-              setState(() {
-                _isSearching = false;
-              });
-              // Reinicia o scanner após voltar
-              _mobileScannerController?.start();
-            }
-          } else if (mounted) {
-            _showErrorDialog('Artigo não encontrado', 'Código: $code');
-            setState(() => _isSearching = false);
-            _mobileScannerController?.start();
-          }
-        } catch (e) {
-          print('❌ Erro ao buscar artigo: $e');
-          if (mounted) {
-            _showErrorDialog('Erro na busca', 'Não foi possível buscar o artigo.\n\n$e');
-            setState(() => _isSearching = false);
-            _mobileScannerController?.start();
-          }
-        }
-
-        break;
+      if (artigo != null && mounted) {
+        await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Artigo não encontrado: $code'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao procurar artigo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        setState(() => _isSearching = false);
       }
     }
   }
 
-  void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _handleBottomNavigation(int index) async {
-    if (index == _selectedBottomIndex) return;
-
-    setState(() {
-      _selectedBottomIndex = index;
-    });
-
+  void _handleBottomNavigation(int index) {
     if (index == 0) {
-      await _disposeAllCameras();
-      
-      if (!mounted) return;
-      
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => const ArmazemScreen(),
-        ),
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ArmazemScreen()),
       );
-      
-      if (mounted && !_isDisposed) {
-        setState(() {
-          _selectedBottomIndex = 1;
-        });
-        await _reinitializeCurrentScanner();
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final cameraSize = screenSize.width * 0.85;
-    
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            // Área da câmara QUADRADA e MAIOR
+            // Área da câmara
             Expanded(
-              child: Center(
-                child: Container(
-                  width: cameraSize,
-                  height: cameraSize,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    children: [
-                      // Preview da câmara ou mobile scanner
-                      if (_isSwitching)
-                        // Mostrar loading durante transição
-                        Center(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+                child: Stack(
+                  children: [
+                    // Preview da câmara
+                    Positioned.fill(
+                      child: _buildCameraPreview(),
+                    ),
+                    
+                    // Overlay
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _selectedMethod == ScanMethod.barcode
+                            ? BarcodeOverlayPainter()
+                            : QROverlayPainter(),
+                      ),
+                    ),
+                    
+                    // Indicador de pesquisa
+                    if (_isSearching)
+                      Container(
+                        color: Colors.black54,
+                        child: const Center(
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              ),
-                              const SizedBox(height: 16),
+                              CircularProgressIndicator(color: Colors.white),
+                              SizedBox(height: 16),
                               Text(
-                                'A mudar scanner...',
+                                'A procurar artigo...',
                                 style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (_selectedMethod == ScanMethod.qrcode || 
-                          _selectedMethod == ScanMethod.barcode)
-                        _buildMobileScanner()
-                      else if (_isCameraInitialized && _cameraController != null)
-                        Center(
-                          child: CameraPreview(_cameraController!),
-                        )
-                      else
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'A inicializar câmara...',
-                                style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      // Overlays para QR/Barcode
-                      if (!_isSwitching && _selectedMethod == ScanMethod.qrcode)
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: QROverlayPainter(),
-                          ),
-                        ),
-
-                      if (!_isSwitching && _selectedMethod == ScanMethod.barcode)
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: BarcodeOverlayPainter(),
-                          ),
-                        ),
-
-                      // Indicador de pesquisa
-                      if (_isSearching)
-                        Container(
-                          color: Colors.black.withOpacity(0.7),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(
                                   color: Colors.white,
-                                  strokeWidth: 3,
+                                  fontSize: 16,
                                 ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'A procurar artigo...',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      // Texto de instrução
-                      Positioned(
-                        bottom: 20,
-                        left: 20,
-                        right: 20,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            _getInstructionText(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    
+                    // Instrução
+                    Positioned(
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _getInstructionText(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // Barra de métodos de scan
+            // ✅ ALTERADO: Barra de métodos com BARRAS no centro
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -534,15 +498,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     icon: Icons.nfc,
                     label: 'NFC',
                   ),
-                  _buildScanMethodButton(
-                    method: ScanMethod.ar,
-                    icon: Icons.view_in_ar,
-                    label: 'AR',
-                  ),
+                  // ✅ BARRAS agora está no CENTRO (posição 3)
                   _buildScanMethodButton(
                     method: ScanMethod.barcode,
                     icon: Icons.barcode_reader,
                     label: 'Barras',
+                  ),
+                  // ✅ AR trocou de posição (posição 4)
+                  _buildScanMethodButton(
+                    method: ScanMethod.ar,
+                    icon: Icons.view_in_ar,
+                    label: 'AR',
                   ),
                   _buildScanMethodButton(
                     method: ScanMethod.qrcode,
@@ -574,8 +540,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildCameraPreview() {
+    // Para AR usa CameraController
+    if (_selectedMethod == ScanMethod.ar) {
+      if (_isCameraInitialized && _cameraController != null) {
+        return CameraPreview(_cameraController!);
+      }
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+    
+    // Para QR/Barcode usa MobileScanner
+    return _buildMobileScanner();
+  }
+
   Widget _buildMobileScanner() {
-    // Verifica se o controller existe, se não, mostra loading
     if (_mobileScannerController == null) {
       return Center(
         child: Column(
@@ -598,7 +578,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
     
+    // ✅ Key única baseada no hashCode do controller para forçar recriação
     return MobileScanner(
+      key: ValueKey(_mobileScannerController.hashCode),
       controller: _mobileScannerController!,
       onDetect: _onBarcodeDetected,
     );

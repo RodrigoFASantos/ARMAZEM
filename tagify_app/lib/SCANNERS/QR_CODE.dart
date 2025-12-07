@@ -15,6 +15,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     facing: CameraFacing.back,
+    formats: [BarcodeFormat.qrCode],
   );
   
   final _apiService = ApiService();
@@ -26,6 +27,19 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     super.dispose();
   }
 
+  /// Verifica se o formato é QR Code
+  bool _isValidQRFormat(BarcodeFormat? format) {
+    if (format == null) return false;
+    
+    // ACEITAR apenas QR Code
+    if (format == BarcodeFormat.qrCode) {
+      return true;
+    }
+    
+    print('⚠️ Formato rejeitado: $format (não é QR Code)');
+    return false;
+  }
+
   void _onQRDetected(BarcodeCapture capture) async {
     if (_isSearching) return;
 
@@ -33,21 +47,26 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     
     for (final barcode in barcodes) {
       final String? code = barcode.rawValue;
+      final BarcodeFormat? format = barcode.format;
+      
+      // VERIFICAÇÃO EXTRA: Ignorar se não for QR Code
+      if (!_isValidQRFormat(format)) {
+        print('🚫 Ignorado: $code (formato: $format)');
+        continue; // Ignora e continua a procurar
+      }
       
       if (code != null && code.isNotEmpty) {
         setState(() => _isSearching = true);
         _controller.stop();
 
-        print('📱 QR Code detectado: $code');
+        print('📱 QR Code detectado: $code (formato: $format)');
 
         try {
           final artigo = await _apiService.getArtigoByCodigo(code);
 
           if (artigo != null && mounted) {
-            // ✨ USAR NAVEGAÇÃO INTELIGENTE
             await ArtigoNavigationHelper.navigateToArtigoDetail(context, artigo);
             
-            // Voltar para home após ver detalhes
             if (mounted) {
               Navigator.of(context).pop();
             }
