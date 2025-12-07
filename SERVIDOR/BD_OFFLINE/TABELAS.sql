@@ -1,5 +1,5 @@
 -- Schema SQLite para ARMAZEM (Base de Dados Offline)
--- VERSÃO 3.0 - Com campos de localização detalhada
+-- VERSÃO 3.1 - Corrigido sintaxe SQL
 
 -- Tabela: Utilizador
 CREATE TABLE IF NOT EXISTS UTILIZADOR (
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS ESTADO (
     Designacao TEXT NOT NULL
 );
 
--- Tabela: Armazem (COM NOVOS CAMPOS DE LOCALIZAÇÃO)
+-- Tabela: Armazem
 CREATE TABLE IF NOT EXISTS ARMAZEM (
     ID_armazem INTEGER PRIMARY KEY,
     Descricao TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS ARTIGO (
     Imagem TEXT,
     Cod_bar TEXT,
     Cod_NFC TEXT,
-    Cod_RFID TEXT
+    Cod_RFID TEXT,
     FOREIGN KEY (ID_tipo) REFERENCES TIPO(ID_tipo),
     FOREIGN KEY (ID_familia) REFERENCES FAMILIA(ID_familia)
 );
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS MOVIMENTOS (
     NCorredor INTEGER,
     DCorredor TEXT,
     Zona INTEGER,
-    Rack INTEGER
+    Rack INTEGER,
     FOREIGN KEY (ID_artigo) REFERENCES ARTIGO(ID_artigo),
     FOREIGN KEY (ID_armazem) REFERENCES ARMAZEM(ID_armazem)
 );

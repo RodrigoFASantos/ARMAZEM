@@ -60,7 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_artigo_cod_nfc ON ARTIGO(Cod_NFC);
 CREATE INDEX IF NOT EXISTS idx_artigo_cod_rfid ON ARTIGO(Cod_RFID);
 CREATE INDEX IF NOT EXISTS idx_artigo_referencia ON ARTIGO(Referencia);
 
--- Tabela: Equipamento (CORRIGIDO: Ciclo_inspecao_dias)
+-- Tabela: Equipamento ( Ciclo_inspecao_dias)
 CREATE TABLE IF NOT EXISTS EQUIPAMENTO (
     ID_equipamento INTEGER PRIMARY KEY,
     ID_artigo INTEGER NOT NULL,

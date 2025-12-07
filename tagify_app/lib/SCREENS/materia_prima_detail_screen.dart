@@ -2,7 +2,15 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../SERVICE/database_helper.dart';
 
+/// =============================================================================
+/// ECRÃ DE DETALHE DE MATÉRIA-PRIMA
+/// =============================================================================
+/// Este ecrã mostra toda a informação duma matéria-prima específica.
+/// Carrega os dados do armazém e localização a partir dos movimentos.
+/// O stock é calculado somando entradas e subtraindo saídas de todos os movimentos.
+/// =============================================================================
 class MateriaPrimaDetailScreen extends StatefulWidget {
+  /// O artigo associado à matéria-prima (contém designação, códigos, etc.)
   final Artigo artigo;
 
   const MateriaPrimaDetailScreen({
@@ -15,26 +23,41 @@ class MateriaPrimaDetailScreen extends StatefulWidget {
 }
 
 class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
+  /// Armazém onde está a matéria-prima (carregado da BD)
   Armazem? _armazem;
+  
+  /// Último movimento da matéria-prima (tem a localização atual)
   Movimento? _ultimoMovimento;
+  
+  /// Flag pra saber se ainda está a carregar dados
   bool _isLoading = true;
+  
+  /// Stock total (soma das entradas menos saídas)
   double _stockTotal = 0;
 
   @override
   void initState() {
     super.initState();
+    // Mal o widget arranca, vai buscar os dados à BD
     _carregarDados();
   }
 
+  /// =========================================================================
+  /// CARREGAR DADOS
+  /// =========================================================================
+  /// Vai buscar os movimentos do artigo pra calcular stock e localização.
+  /// Percorre todos os movimentos e soma entradas/saídas.
+  /// O último movimento tem a localização atual (armazém, rack, prateleira, etc.)
+  /// =========================================================================
   Future<void> _carregarDados() async {
     try {
       final db = DatabaseHelper.instance;
       
-      // Buscar movimentos do artigo para encontrar armazém, localização e stock
+      // Buscar movimentos do artigo pra encontrar armazém, localização e stock
       final movimentos = await db.getMovimentosByArtigo(widget.artigo.id);
       
       if (movimentos.isNotEmpty) {
-        // Calcular stock total
+        // Calcular stock total percorrendo todos os movimentos
         double entradas = 0;
         double saidas = 0;
         
@@ -45,20 +68,22 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
         
         _stockTotal = entradas - saidas;
         
-        // Último movimento tem a localização atual
+        // O último movimento (mais recente) tem a localização atual
         _ultimoMovimento = Movimento.fromJson(movimentos.first);
         
-        // Buscar dados do armazém
+        // Buscar dados do armazém pelo ID
         final armazemData = await db.getArmazemById(_ultimoMovimento!.idArmazem);
         if (armazemData != null) {
           _armazem = Armazem.fromJson(armazemData);
         }
       }
       
+      // Dados carregados, atualiza o ecrã
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      // Se der erro, mostra na consola e para o loading
       print('Erro ao carregar dados: $e');
       setState(() {
         _isLoading = false;
@@ -70,26 +95,39 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
+      
+      // AppBar cinzento claro como pedido
       appBar: AppBar(
-        title: const Text('MATÉRIA-PRIMA'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        title: const Text(
+          'MATÉRIA-PRIMA',
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.grey[200], // Cinzento quase branco
+        foregroundColor: Colors.black87,   // Ícones e texto escuros
         centerTitle: true,
+        elevation: 1, // Sombra suave pra destacar
       ),
+      
+      // Corpo do ecrã
       body: _isLoading
+          // Se ainda está a carregar, mostra spinner
           ? const Center(child: CircularProgressIndicator())
+          // Se já carregou, mostra o conteúdo
           : SingleChildScrollView(
               child: Column(
                 children: [
                   const SizedBox(height: 16),
 
-                  // Card 1: Informações principais
+                  // =========================================================
+                  // CARD 1: INFORMAÇÕES PRINCIPAIS
+                  // =========================================================
                   _buildInfoCard(
                     context,
                     [
                       _buildInfoRow('Nome', widget.artigo.designacao),
-                      _buildInfoRow('Categoria', widget.artigo.familia?.designacao ?? 'N/A'),
-                      _buildInfoRow('Tipo', widget.artigo.tipo?.designacao ?? 'N/A'),
                       _buildInfoRow('Referência', widget.artigo.referencia ?? 'N/A'),
                       _buildInfoRow('Stock', _stockTotal.toStringAsFixed(0)),
                     ],
@@ -97,7 +135,11 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Card 2: Localização (dados do MOVIMENTO)
+                  // =========================================================
+                  // CARD 2: LOCALIZAÇÃO
+                  // =========================================================
+                  // Dados vêm do último movimento na BD
+                  // =========================================================
                   _buildInfoCard(
                     context,
                     [
@@ -111,10 +153,9 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
 
                   const SizedBox(height: 16),
 
-                  
-
-
-                  // Imagem (apenas se existir)
+                  // =========================================================
+                  // IMAGEM DA MATÉRIA-PRIMA (se existir)
+                  // =========================================================
                   if (widget.artigo.imagem != null && widget.artigo.imagem!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -131,6 +172,7 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
                           child: Image.network(
                             widget.artigo.imagem!,
                             fit: BoxFit.contain,
+                            // Se a imagem não carregar, mostra ícone de erro
                             errorBuilder: (context, error, stackTrace) {
                               return Center(
                                 child: Column(
@@ -157,6 +199,12 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
     );
   }
 
+  /// =========================================================================
+  /// CONSTRUIR CARD DE INFORMAÇÃO
+  /// =========================================================================
+  /// Cria um card bonito com lista de informações.
+  /// Usado pra agrupar dados relacionados (info, localização, etc.)
+  /// =========================================================================
   Widget _buildInfoCard(BuildContext context, List<Widget> children) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -179,11 +227,18 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
     );
   }
 
+  /// =========================================================================
+  /// CONSTRUIR LINHA DE INFORMAÇÃO
+  /// =========================================================================
+  /// Cria uma linha com label à esquerda e valor à direita.
+  /// Formato: "Label          Valor"
+  /// =========================================================================
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
+          // Label (largura fixa pra alinhar tudo)
           SizedBox(
             width: 100,
             child: Text(
@@ -194,6 +249,7 @@ class _MateriaPrimaDetailScreenState extends State<MateriaPrimaDetailScreen> {
               ),
             ),
           ),
+          // Valor (ocupa o resto do espaço)
           Expanded(
             child: Text(
               value,

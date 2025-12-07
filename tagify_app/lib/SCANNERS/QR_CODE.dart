@@ -36,7 +36,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       return true;
     }
     
-    print('⚠️ Formato rejeitado: $format (não é QR Code)');
+    print(' Formato rejeitado: $format (não é QR Code)');
     return false;
   }
 
@@ -76,7 +76,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             _controller.start();
           }
         } catch (e) {
-          print('❌ Erro ao buscar artigo: $e');
+          print(' Erro ao buscar artigo: $e');
           if (mounted) {
             _showErrorDialog('Erro na busca', 'Não foi possível buscar o artigo.\n\n$e');
             setState(() => _isSearching = false);

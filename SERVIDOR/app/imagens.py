@@ -42,7 +42,7 @@ async def upload_imagem_artigo(
         with open(file_path, 'wb') as f:
             f.write(content)
         
-        print(f"✅ Imagem guardada: {file_path}")
+        print(f" Imagem guardada: {file_path}")
         
         # Atualizar BD com caminho da imagem
         conn = get_connection()
@@ -192,7 +192,7 @@ def delete_imagem_artigo(id_artigo: int):
             # Remover ficheiro se existir
             if image_path.exists():
                 os.remove(image_path)
-                print(f"🗑️ Imagem removida: {image_path}")
+                print(f" Imagem removida: {image_path}")
         
         # Atualizar BD
         cur.execute("""

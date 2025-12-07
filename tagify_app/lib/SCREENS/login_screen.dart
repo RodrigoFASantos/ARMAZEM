@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSyncing = false;
   bool _obscurePassword = true;
   bool _isServerOnline = false;
-  bool _hasSynced = false; // ✅ NOVO: Indica se já sincronizou
+  bool _hasSynced = false; // Indica se já sincronizou
   String? _errorMessage;
   String? _syncMessage;
 
@@ -43,9 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isServerOnline = isOnline);
     
     if (isOnline) {
-      print('✅ Servidor online');
+      print(' Servidor online');
     } else {
-      print('⚠️ Servidor offline - Modo offline ativado');
+      print(' Servidor offline - Modo offline ativado');
     }
   }
 
@@ -142,12 +142,12 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (result.success) {
-        // ✅ ALTERADO: Marca que sincronizou (botão fica verde)
+        //   Marca que sincronizou (botão fica verde)
         setState(() {
           _hasSynced = true;
         });
         
-        // ✅ ALTERADO: Apenas SnackBar em vez de Dialog
+        //   Apenas SnackBar em vez de Dialog
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -371,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ✅ Botão Sincronizar - AZUL antes, VERDE depois
+                  //  Botão Sincronizar - AZUL antes, VERDE depois
                   OutlinedButton.icon(
                     onPressed: (_isLoading || _isSyncing) ? null : _handleSync,
                     style: OutlinedButton.styleFrom(
@@ -383,9 +383,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: _isSyncing
                             ? Colors.grey
                             : _hasSynced
-                                ? Colors.green  // ✅ VERDE depois de sincronizar
+                                ? Colors.green  //  VERDE depois de sincronizar
                                 : _isServerOnline
-                                    ? Colors.blue  // ✅ AZUL antes de sincronizar
+                                    ? Colors.blue  //  AZUL antes de sincronizar
                                     : Colors.grey,
                         width: 2,
                       ),
@@ -398,9 +398,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: _isSyncing
                           ? Colors.grey
                           : _hasSynced
-                              ? Colors.green  // ✅ VERDE depois de sincronizar
+                              ? Colors.green  //  VERDE depois de sincronizar
                               : _isServerOnline
-                                  ? Colors.blue  // ✅ AZUL antes de sincronizar
+                                  ? Colors.blue  //  AZUL antes de sincronizar
                                   : Colors.grey,
                     ),
                     label: Text(
@@ -411,9 +411,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: _isSyncing
                             ? Colors.grey
                             : _hasSynced
-                                ? Colors.green  // ✅ VERDE depois de sincronizar
+                                ? Colors.green  //  VERDE depois de sincronizar
                                 : _isServerOnline
-                                    ? Colors.blue  // ✅ AZUL antes de sincronizar
+                                    ? Colors.blue  //  AZUL antes de sincronizar
                                     : Colors.grey,
                       ),
                     ),

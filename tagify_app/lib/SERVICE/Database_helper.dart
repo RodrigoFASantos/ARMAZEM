@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5, // INCREMENTADO para forçar upgrade
+      version: 8, // INCREMENTADO para forçar upgrade (adiciona campo Design)
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
         // Apaga tudo e recria com nova estrutura
@@ -37,6 +37,8 @@ class DatabaseHelper {
       },
     );
   }
+
+
 
   Future<void> _createDB(Database db, int version) async {
     final schema = await rootBundle.loadString('assets/sql/TABELAS.sql');

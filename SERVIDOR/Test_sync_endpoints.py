@@ -27,17 +27,17 @@ def test_endpoint(endpoint):
                     print(f"\nPrimeiro registo:")
                     print(json.dumps(data[0], indent=2, ensure_ascii=False))
                 else:
-                    print("⚠️  LISTA VAZIA - Base de dados não tem dados!")
+                    print("  LISTA VAZIA - Base de dados não tem dados!")
             else:
                 print(f"Tipo de resposta: {type(data)}")
                 print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
-            print(f"❌ Erro: {response.text}")
+            print(f" Erro: {response.text}")
             
     except requests.exceptions.ConnectionError:
-        print("❌ Erro de conexão - Servidor não está a correr!")
+        print(" Erro de conexão - Servidor não está a correr!")
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f" Erro: {e}")
 
 def main():
     print("🔍 Teste de Endpoints de Sincronização")
@@ -64,7 +64,7 @@ def main():
         test_endpoint(endpoint)
     
     print("\n" + "="*60)
-    print("✅ Testes concluídos!")
+    print(" Testes concluídos!")
     print("="*60)
 
 if __name__ == "__main__":

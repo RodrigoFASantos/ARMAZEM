@@ -70,14 +70,14 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
         _initializeRFIDStream();
       }
     } on PlatformException catch (e) {
-      print('❌ Erro ao verificar RFID: ${e.message}');
+      print(' Erro ao verificar RFID: ${e.message}');
       if (!mounted) return;
       setState(() {
         _isRFIDAvailable = false;
         _statusMessage = 'Erro ao verificar RFID';
       });
     } on MissingPluginException catch (e) {
-      print('❌ Plugin RFID não implementado: ${e.message}');
+      print(' Plugin RFID não implementado: ${e.message}');
       if (!mounted) return;
       setState(() {
         _isRFIDAvailable = false;
@@ -98,7 +98,7 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
         }
       },
       onError: (dynamic error) {
-        print('❌ Erro no stream RFID: $error');
+        print(' Erro no stream RFID: $error');
         if (!mounted) return;
         setState(() {
           _statusMessage = 'Erro na comunicação RFID';
@@ -127,7 +127,7 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
       
       print('📡 Scanner RFID iniciado');
     } on PlatformException catch (e) {
-      print('❌ Erro ao iniciar scan: ${e.message}');
+      print(' Erro ao iniciar scan: ${e.message}');
       if (!mounted) return;
       setState(() {
         _statusMessage = 'Erro ao iniciar scan';
@@ -140,7 +140,7 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
     try {
       await _methodChannel.invokeMethod('stopScan');
     } on PlatformException catch (e) {
-      print('❌ Erro ao parar scan: ${e.message}');
+      print(' Erro ao parar scan: ${e.message}');
     }
     
     if (!mounted) return;
@@ -201,7 +201,7 @@ class _RFIDScannerScreenState extends State<RFIDScannerScreen>
         });
       }
     } catch (e) {
-      print('❌ Erro ao buscar artigo: $e');
+      print(' Erro ao buscar artigo: $e');
       if (!mounted) return;
       
       _showErrorDialog(

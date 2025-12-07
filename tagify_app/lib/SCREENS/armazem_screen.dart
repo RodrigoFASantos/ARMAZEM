@@ -11,13 +11,19 @@ import 'home_screen.dart';
 class ArtigoComEquipamento {
   final Artigo artigo;
   final Equipamento? equipamento;
-  final String? armazemNome; // ✅ NOVO: Armazém do artigo
+  final String? armazemNome;
 
   ArtigoComEquipamento({
     required this.artigo,
     this.equipamento,
     this.armazemNome,
   });
+  
+  /// Verifica se este item é um EQUIPAMENTO (tem registo na tabela EQUIPAMENTO)
+  bool get isEquipamento => equipamento != null;
+  
+  /// Verifica se este item é um ARTIGO normal (não tem registo na tabela EQUIPAMENTO)
+  bool get isArtigo => equipamento == null;
 }
 
 class ArmazemScreen extends StatefulWidget {
@@ -70,7 +76,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
         equipamentosMap[equip.idArtigo] = equip;
       }
       
-      // ✅ Combinar artigos com equipamentos E buscar armazém
+      // Combinar artigos com equipamentos E buscar armazém
       final itensCompletos = <ArtigoComEquipamento>[];
       
       for (var artigo in artigos) {
@@ -114,9 +120,9 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
       final results = await db.query('ESTADO');
       
       _estados = results.map((row) => Estado.fromJson(row)).toList();
-      print('✅ ${_estados.length} estados carregados');
+      print(' ${_estados.length} estados carregados');
     } catch (e) {
-      print('⚠️ Erro ao carregar estados: $e');
+      print('Erro ao carregar estados: $e');
       _estados = [];
     }
   }
@@ -128,12 +134,15 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
         _filtroAtivo = null;
       } else {
         _itensFiltrados = _itens.where((item) {
-          final designacao = item.artigo.designacao.toLowerCase();
+          // Para equipamentos, pesquisa no design; para artigos, pesquisa na designação
+          final nome = item.isEquipamento 
+              ? (item.artigo.designacao).toLowerCase()
+              : item.artigo.designacao.toLowerCase();
           final referencia = (item.artigo.referencia ?? '').toLowerCase();
           final armazem = (item.armazemNome ?? '').toLowerCase();
           final searchLower = query.toLowerCase();
           
-          return designacao.contains(searchLower) || 
+          return nome.contains(searchLower) || 
                  referencia.contains(searchLower) ||
                  armazem.contains(searchLower);
         }).toList();
@@ -242,7 +251,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     }
     
     return _estados.map((estado) {
-      final colorInfo = _getEstadoColorInfo(estado.designacao);
+      final colorInfo = _getEstadoColorInfo(estado.id);
       
       return ListTile(
         leading: Icon(Icons.circle, color: colorInfo['color'] as Color),
@@ -256,21 +265,18 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     }).toList();
   }
 
-  Map<String, dynamic> _getEstadoColorInfo(String designacao) {
-    final lower = designacao.toLowerCase();
-    
-    if (lower.contains('operacional') && !lower.contains('não') && !lower.contains('nao')) {
-      return {'color': Colors.green, 'icon': Icons.check_circle};
-    } else if (lower.contains('manutenção') || lower.contains('manutencao')) {
-      return {'color': Colors.orange, 'icon': Icons.build};
-    } else if (lower.contains('avariado') || lower.contains('não operacional') || 
-               lower.contains('nao operacional') || lower.contains('inativo')) {
-      return {'color': Colors.red, 'icon': Icons.cancel};
-    } else if (lower.contains('reserva') || lower.contains('standby')) {
-      return {'color': Colors.blue, 'icon': Icons.pause_circle};
+  /// Retorna cor e ícone baseado no ID_Estado
+  Map<String, dynamic> _getEstadoColorInfo(int idEstado) {
+    switch (idEstado) {
+      case 1: // Operacional
+        return {'color': Colors.green, 'icon': Icons.check_circle};
+      case 2: // Em Manutenção
+        return {'color': Colors.orange, 'icon': Icons.build};
+      case 3: // Não Operacional
+        return {'color': Colors.red, 'icon': Icons.cancel};
+      default:
+        return {'color': Colors.grey, 'icon': Icons.help};
     }
-    
-    return {'color': Colors.grey, 'icon': Icons.help};
   }
 
   void _filterByEstado(int idEstado, String nomeEstado) {
@@ -308,8 +314,17 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     );
   }
 
+  /// =========================================================================
+  /// NAVEGAÇÃO CORRIGIDA
+  /// =========================================================================
+  /// PRIORIDADE 1: Se tem registo na tabela EQUIPAMENTO → EquipamentoDetailScreen
+  /// PRIORIDADE 2: Se é ARTIGO (sem equipamento):
+  ///   - ID_Tipo = 1 → MateriaPrimaDetailScreen
+  ///   - ID_Tipo = 2 → ProdutoDetailScreen
+  /// =========================================================================
   void _onItemTap(ArtigoComEquipamento item) {
-    if (item.equipamento != null) {
+    // PRIORIDADE 1: Verificar se é EQUIPAMENTO
+    if (item.isEquipamento) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => EquipamentoDetailScreen(
@@ -318,27 +333,56 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
           ),
         ),
       );
+      return;
+    }
+    
+    // PRIORIDADE 2: É um ARTIGO normal - verificar ID_Tipo
+    final idTipo = item.artigo.idTipo;
+    
+    if (idTipo == 1) {
+      // Matéria-Prima
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MateriaPrimaDetailScreen(
+            artigo: item.artigo,
+          ),
+        ),
+      );
+      return;
+    }
+    
+    if (idTipo == 2) {
+      // Produto Final
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProdutoDetailScreen(
+            artigo: item.artigo,
+          ),
+        ),
+      );
+      return;
+    }
+    
+    // FALLBACK: Se não tem ID_Tipo definido, usa designação
+    final tipo = item.artigo.tipo?.designacao.toLowerCase() ?? '';
+    
+    if (tipo.contains('produto') || tipo.contains('final')) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProdutoDetailScreen(
+            artigo: item.artigo,
+          ),
+        ),
+      );
     } else {
-      final familia = item.artigo.familia?.designacao.toLowerCase() ?? '';
-      final tipo = item.artigo.tipo?.designacao.toLowerCase() ?? '';
-      
-      if (familia.contains('produto') || tipo.contains('produto')) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ProdutoDetailScreen(
-              artigo: item.artigo,
-            ),
+      // Default: Matéria-Prima
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MateriaPrimaDetailScreen(
+            artigo: item.artigo,
           ),
-        );
-      } else {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => MateriaPrimaDetailScreen(
-              artigo: item.artigo,
-            ),
-          ),
-        );
-      }
+        ),
+      );
     }
   }
 
@@ -354,8 +398,6 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Armazém'),
-        automaticallyImplyLeading: false,
         actions: [
           if (_filtroAtivo != null)
             Padding(
@@ -392,7 +434,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Pesquisar artigo ou armazém...',
+                  hintText: 'Pesquisar artigo...',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
@@ -522,30 +564,45 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     );
   }
 
+  /// =========================================================================
+  /// CARD DO ITEM
+  /// =========================================================================
+  /// EQUIPAMENTOS: Cores baseadas no ID_Estado (Verde/Amarelo/Vermelho)
+  /// ARTIGOS: Sem cores (fundo cinzento neutro)
+  /// =========================================================================
   Widget _buildItemCard(ArtigoComEquipamento item) {
     Color backgroundColor;
-    Color? borderColor;
+    Color borderColor;
     
-    if (item.equipamento != null) {
-      final estadoDesig = item.equipamento!.estadoDesignacao?.toLowerCase() ?? '';
+    if (item.isEquipamento) {
+      // =====================================================================
+      // É EQUIPAMENTO - Cor baseada no ID_Estado
+      // =====================================================================
+      final idEstado = item.equipamento!.idEstado;
       
-      if (estadoDesig.contains('operacional') && !estadoDesig.contains('não') && !estadoDesig.contains('nao')) {
-        backgroundColor = Colors.green[50]!;
-        borderColor = Colors.green[300];
-      } else if (estadoDesig.contains('manutenção') || estadoDesig.contains('manutencao')) {
-        backgroundColor = Colors.yellow[50]!;
-        borderColor = Colors.yellow[600];
-      } else if (estadoDesig.contains('avariado') || estadoDesig.contains('não operacional') || 
-                 estadoDesig.contains('nao operacional') || estadoDesig.contains('inativo')) {
-        backgroundColor = Colors.red[50]!;
-        borderColor = Colors.red[300];
-      } else {
-        backgroundColor = Colors.grey[50]!;
-        borderColor = Colors.grey[300];
+      switch (idEstado) {
+        case 1: // Operacional - VERDE
+          backgroundColor = Colors.green[50]!;
+          borderColor = Colors.green[400]!;
+          break;
+        case 2: // Em Manutenção - AMARELO
+          backgroundColor = Colors.yellow[50]!;
+          borderColor = Colors.yellow[700]!;
+          break;
+        case 3: // Não Operacional - VERMELHO
+          backgroundColor = Colors.red[50]!;
+          borderColor = Colors.red[400]!;
+          break;
+        default:
+          backgroundColor = Colors.grey[100]!;
+          borderColor = Colors.grey[400]!;
       }
     } else {
+      // =====================================================================
+      // É ARTIGO - Sem cores (fundo cinzento neutro)
+      // =====================================================================
       backgroundColor = Colors.grey[50]!;
-      borderColor = Colors.grey[300];
+      borderColor = Colors.grey[300]!;
     }
     
     return Card(
@@ -554,7 +611,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: borderColor!, width: 1.5),
+        side: BorderSide(color: borderColor, width: 1.5),
       ),
       child: InkWell(
         onTap: () => _onItemTap(item),
@@ -564,6 +621,7 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Ícone ou imagem
               Container(
                 width: 60,
                 height: 60,
@@ -587,12 +645,18 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
               
               const SizedBox(width: 12),
               
+              // Informações do item
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Nome do item:
+                    // - EQUIPAMENTO: usa equipamento.design (fallback para artigo.designacao)
+                    // - ARTIGO: usa artigo.designacao
                     Text(
-                      item.artigo.designacao,
+                      item.isEquipamento 
+                          ? (item.artigo.designacao)
+                          : item.artigo.designacao,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -602,9 +666,10 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
                     ),
                     const SizedBox(height: 4),
                     
+                    // Referência
                     if (item.artigo.referencia != null && item.artigo.referencia!.isNotEmpty)
                       Text(
-                        'Referência: ${item.artigo.referencia}',
+                        'Ref: ${item.artigo.referencia}',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey[700],
@@ -612,33 +677,41 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
                         ),
                       ),
                     
+                    // Badge de tipo/estado
+                    const SizedBox(height: 4),
+                    _buildBadge(item),
+                    
+                    // Família
                     if (item.artigo.familia != null)
-                      Text(
-                        'Família: ${item.artigo.familia!.designacao}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Família: ${item.artigo.familia!.designacao}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                     
-                    // ✅ SEMPRE mostra o armazém (se existir)
+                    // Armazém
                     if (item.armazemNome != null && item.armazemNome!.isNotEmpty)
-                      Row(
-                        children: [
-                          Icon(Icons.warehouse, size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            item.armazemNome!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[700],
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warehouse, size: 14, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              item.armazemNome!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    
-                    // ✅ REMOVIDO: Badge de estado para equipamentos
-                    // A cor de fundo já indica o estado
                   ],
                 ),
               ),
@@ -649,43 +722,119 @@ class _ArmazemScreenState extends State<ArmazemScreen> {
     );
   }
 
+  /// =========================================================================
+  /// BADGE DO ITEM
+  /// =========================================================================
+  /// EQUIPAMENTOS: Badge com estado (Operacional/Manutenção/Não Operacional)
+  /// ARTIGOS: Badge com tipo (Matéria-Prima/Produto Final)
+  /// =========================================================================
+  Widget _buildBadge(ArtigoComEquipamento item) {
+    String texto;
+    Color corFundo;
+    Color corTexto;
+    
+    if (item.isEquipamento) {
+      // Badge de ESTADO do equipamento
+      final idEstado = item.equipamento!.idEstado;
+      
+      switch (idEstado) {
+        case 1:
+          texto = 'Operacional';
+          corFundo = Colors.green[100]!;
+          corTexto = Colors.green[800]!;
+          break;
+        case 2:
+          texto = 'Em Manutenção';
+          corFundo = Colors.yellow[100]!;
+          corTexto = Colors.yellow[900]!;
+          break;
+        case 3:
+          texto = 'Não Operacional';
+          corFundo = Colors.red[100]!;
+          corTexto = Colors.red[800]!;
+          break;
+        default:
+          texto = item.equipamento!.estadoDesignacao ?? 'Equipamento';
+          corFundo = Colors.grey[200]!;
+          corTexto = Colors.grey[800]!;
+      }
+    } else {
+      // Badge de TIPO do artigo
+      final idTipo = item.artigo.idTipo;
+      
+      if (idTipo == 1) {
+        texto = 'Matéria-Prima';
+        corFundo = Colors.blue[100]!;
+        corTexto = Colors.blue[800]!;
+      } else if (idTipo == 2) {
+        texto = 'Produto Final';
+        corFundo = Colors.purple[100]!;
+        corTexto = Colors.purple[800]!;
+      } else {
+        texto = item.artigo.tipo?.designacao ?? 'Artigo';
+        corFundo = Colors.grey[200]!;
+        corTexto = Colors.grey[800]!;
+      }
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: corFundo,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          fontSize: 11,
+          color: corTexto,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  /// =========================================================================
+  /// ÍCONE DO ITEM
+  /// =========================================================================
   Widget _getItemIcon(ArtigoComEquipamento item) {
     IconData icon;
     Color color;
     
-    if (item.equipamento != null) {
-      icon = Icons.handyman;
-      color = _getEstadoColorFromDesignacao(item.equipamento!.estadoDesignacao ?? '');
-    } else {
-      final familia = item.artigo.familia?.designacao.toLowerCase() ?? '';
+    if (item.isEquipamento) {
+      // Ícone de equipamento com cor do estado
+      icon = Icons.build;
+      final idEstado = item.equipamento!.idEstado;
       
-      if (familia.contains('parafuso')) {
-        icon = Icons.construction;
-        color = Colors.grey[700]!;
-      } else if (familia.contains('produto')) {
+      switch (idEstado) {
+        case 1:
+          color = Colors.green[700]!;
+          break;
+        case 2:
+          color = Colors.orange[700]!;
+          break;
+        case 3:
+          color = Colors.red[700]!;
+          break;
+        default:
+          color = Colors.grey[700]!;
+      }
+    } else {
+      // Ícone de artigo
+      final idTipo = item.artigo.idTipo;
+      
+      if (idTipo == 1) {
         icon = Icons.inventory_2;
-        color = Colors.grey[700]!;
+        color = Colors.blue[700]!;
+      } else if (idTipo == 2) {
+        icon = Icons.shopping_bag;
+        color = Colors.purple[700]!;
       } else {
         icon = Icons.category;
         color = Colors.grey[700]!;
       }
     }
     
-    return Icon(icon, size: 32, color: color);
-  }
-
-  Color _getEstadoColorFromDesignacao(String designacao) {
-    final lower = designacao.toLowerCase();
-    
-    if (lower.contains('operacional') && !lower.contains('não') && !lower.contains('nao')) {
-      return Colors.green[700]!;
-    } else if (lower.contains('manutenção') || lower.contains('manutencao')) {
-      return Colors.orange[700]!;
-    } else if (lower.contains('avariado') || lower.contains('não operacional') || 
-               lower.contains('nao operacional') || lower.contains('inativo')) {
-      return Colors.red[700]!;
-    } 
-    
-    return Colors.grey[700]!;
+    return Center(child: Icon(icon, size: 32, color: color));
   }
 }

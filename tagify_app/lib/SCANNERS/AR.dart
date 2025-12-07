@@ -8,8 +8,14 @@ import '../SERVICE/API.dart';
 import '../models/models.dart';
 import '../helpers/artigo_navigation_helper.dart';
 
-///  AR Scanner com Reconhecimento REAL usando ML Kit
-/// Otimizado para Zebra TC22
+/// =============================================================================
+/// SCANNER AR COM RECONHECIMENTO REAL USANDO ML KIT
+/// =============================================================================
+/// Este ecrã usa a câmara e o Google ML Kit pra reconhecer objetos.
+/// Quando captura uma foto, analisa as características visuais e tenta
+/// encontrar um match na base de dados de artigos.
+/// Otimizado pra funcionar bem no Zebra TC22.
+/// =============================================================================
 class ARScannerScreen extends StatefulWidget {
   const ARScannerScreen({super.key});
 
@@ -20,39 +26,76 @@ class ARScannerScreen extends StatefulWidget {
 class _ARScannerScreenState extends State<ARScannerScreen> 
     with WidgetsBindingObserver {
   
-  // Câmara
+  // =========================================================================
+  // VARIÁVEIS DE CÂMARA
+  // =========================================================================
+  
+  /// Controlador da câmara
   CameraController? _cameraController;
+  
+  /// Flag pra saber se a câmara já está inicializada
   bool _isCameraInitialized = false;
   
-  // ML Kit
+  /// Tamanho real da imagem capturada (pra escalar a bounding box)
+  Size? _capturedImageSize;
+  
+  // =========================================================================
+  // VARIÁVEIS DO ML KIT
+  // =========================================================================
+  
+  /// Detetor de objetos do Google ML Kit
   ObjectDetector? _objectDetector;
+  
+  /// Flag pra evitar processar várias imagens ao mesmo tempo
   bool _isProcessing = false;
   
-  // Dados
+  // =========================================================================
+  // VARIÁVEIS DE DADOS
+  // =========================================================================
+  
+  /// Serviço da API pra buscar artigos
   final _apiService = ApiService();
+  
+  /// Cache de artigos carregados da BD
   List<Artigo> _artigosCache = [];
   
-  // UI State
+  // =========================================================================
+  // VARIÁVEIS DE UI
+  // =========================================================================
+  
+  /// Mensagem de estado mostrada no topo do ecrã
   String _statusMessage = 'Inicializando...';
+  
+  /// Última deteção do ML Kit (pra desenhar a caixa)
   DetectedObject? _lastDetection;
+  
+  /// Último artigo que fez match com a deteção
   Artigo? _lastMatchedArtigo;
+  
+  /// Nível de confiança do match (0.0 a 1.0)
   double _matchConfidence = 0.0;
 
   @override
   void initState() {
     super.initState();
+    // Regista o observer pra saber quando a app vai pro background
     WidgetsBinding.instance.addObserver(this);
+    // Inicializa todo o sistema AR
     _initializeAR();
   }
 
   @override
   void dispose() {
+    // Remove o observer e liberta recursos
     WidgetsBinding.instance.removeObserver(this);
     _cameraController?.dispose();
     _objectDetector?.close();
     super.dispose();
   }
 
+  /// =========================================================================
+  /// LIFECYCLE - GERIR MUDANÇAS DE ESTADO DA APP
+  /// =========================================================================
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final CameraController? cameraController = _cameraController;
@@ -67,25 +110,26 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     }
   }
 
-  /// 🚀 Inicializar sistema AR completo
+  /// =========================================================================
+  /// INICIALIZAR SISTEMA AR COMPLETO
+  /// =========================================================================
   Future<void> _initializeAR() async {
     setState(() => _statusMessage = 'Carregando artigos...');
     
-    // 1. Carregar artigos
     await _loadArtigos();
     
-    // 2. Inicializar ML Kit
     setState(() => _statusMessage = 'Inicializando ML Kit...');
     await _initializeMLKit();
     
-    // 3. Inicializar câmara
     setState(() => _statusMessage = 'Inicializando câmara...');
     await _initializeCamera();
     
     setState(() => _statusMessage = 'Pronto! Aponte para um artigo');
   }
 
-  /// 📦 Carregar artigos
+  /// =========================================================================
+  /// CARREGAR ARTIGOS DA BD
+  /// =========================================================================
   Future<void> _loadArtigos() async {
     try {
       _artigosCache = await _apiService.getAllArtigos();
@@ -95,7 +139,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     }
   }
 
-  /// 🧠 Inicializar ML Kit
+  /// =========================================================================
+  /// INICIALIZAR GOOGLE ML KIT
+  /// =========================================================================
   Future<void> _initializeMLKit() async {
     try {
       final options = ObjectDetectorOptions(
@@ -107,7 +153,7 @@ class _ARScannerScreenState extends State<ARScannerScreen>
       _objectDetector = ObjectDetector(options: options);
       print('✅ ML Kit inicializado');
     } catch (e) {
-      print('❌ Erro ao inicializar ML Kit: $e');
+      print(' Erro ao inicializar ML Kit: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -119,7 +165,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     }
   }
 
-  /// 📷 Inicializar câmara
+  /// =========================================================================
+  /// INICIALIZAR CÂMARA
+  /// =========================================================================
   Future<void> _initializeCamera() async {
     try {
       final cameras = await availableCameras();
@@ -130,7 +178,7 @@ class _ARScannerScreenState extends State<ARScannerScreen>
 
       _cameraController = CameraController(
         cameras[0],
-        ResolutionPreset.medium, // Medium para melhor performance no TC22
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -143,12 +191,14 @@ class _ARScannerScreenState extends State<ARScannerScreen>
       
       print('✅ Câmara AR inicializada');
     } catch (e) {
-      print('❌ Erro câmara: $e');
+      print(' Erro câmara: $e');
       setState(() => _statusMessage = 'Erro câmara: $e');
     }
   }
 
-  /// 📸 Capturar e processar com ML Kit
+  /// =========================================================================
+  /// CAPTURAR E PROCESSAR IMAGEM
+  /// =========================================================================
   Future<void> _captureAndProcess() async {
     if (_cameraController == null || 
         !_cameraController!.value.isInitialized ||
@@ -160,6 +210,8 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     setState(() {
       _isProcessing = true;
       _statusMessage = 'Capturando...';
+      _lastDetection = null; // Limpa deteção anterior
+      _capturedImageSize = null;
     });
 
     try {
@@ -169,7 +221,23 @@ class _ARScannerScreenState extends State<ARScannerScreen>
       
       setState(() => _statusMessage = 'Analisando...');
 
-      // 2. ML Kit - Detectar objetos
+      // 2. Ler o tamanho real da imagem capturada
+      final imageFile = File(image.path);
+      final imageBytes = await imageFile.readAsBytes();
+      final decodedImage = img.decodeImage(imageBytes);
+      
+      if (decodedImage == null) {
+        throw Exception('Erro ao processar imagem');
+      }
+      
+      // Guarda o tamanho real da imagem capturada
+      _capturedImageSize = Size(
+        decodedImage.width.toDouble(), 
+        decodedImage.height.toDouble(),
+      );
+      print('📐 Tamanho imagem: ${_capturedImageSize!.width}x${_capturedImageSize!.height}');
+
+      // 3. ML Kit - Detetar objetos na imagem
       final inputImage = InputImage.fromFilePath(image.path);
       final detectedObjects = await _objectDetector!.processImage(inputImage);
       
@@ -180,27 +248,21 @@ class _ARScannerScreenState extends State<ARScannerScreen>
         return;
       }
 
+      // Pega o primeiro objeto detetado
       final mainObject = detectedObjects.first;
-      print(' Detectado: ${mainObject.labels.map((l) => l.text).join(", ")}');
+      print('🔍 Detectado: ${mainObject.labels.map((l) => l.text).join(", ")}');
+      print('📦 BoundingBox: ${mainObject.boundingBox}');
       
       setState(() {
         _lastDetection = mainObject;
         _statusMessage = 'Objeto detectado! Procurando match...';
       });
 
-      // 3. Extrair características visuais
-      final imageFile = File(image.path);
-      final imageBytes = await imageFile.readAsBytes();
-      final decodedImage = img.decodeImage(imageBytes);
-      
-      if (decodedImage == null) {
-        throw Exception('Erro ao processar imagem');
-      }
-
+      // 4. Extrair características visuais
       final visualFeatures = _extractVisualFeatures(decodedImage);
       print('🎨 Features: ${visualFeatures.toString()}');
 
-      // 4. Encontrar melhor match
+      // 5. Encontrar melhor match na base de dados
       final match = await _findBestMatch(mainObject, visualFeatures);
       
       if (match != null && mounted) {
@@ -215,11 +277,14 @@ class _ARScannerScreenState extends State<ARScannerScreen>
       } else {
         setState(() => _statusMessage = 'Sem match. Tente outro ângulo');
         await Future.delayed(const Duration(seconds: 2));
-        setState(() => _statusMessage = 'Pronto! Aponte para um artigo');
+        setState(() {
+          _lastDetection = null;
+          _statusMessage = 'Pronto! Aponte para um artigo';
+        });
       }
 
     } catch (e) {
-      print('❌ Erro: $e');
+      print(' Erro: $e');
       setState(() => _statusMessage = 'Erro: $e');
       await Future.delayed(const Duration(seconds: 2));
       setState(() => _statusMessage = 'Pronto! Aponte para um artigo');
@@ -228,7 +293,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     }
   }
 
-  /// 🎨 Extrair características visuais
+  /// =========================================================================
+  /// EXTRAIR CARACTERÍSTICAS VISUAIS
+  /// =========================================================================
   Map<String, dynamic> _extractVisualFeatures(img.Image image) {
     final resized = img.copyResize(image, width: 100);
     
@@ -291,7 +358,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     };
   }
 
-  /// 🔍 Encontrar melhor match
+  /// =========================================================================
+  /// ENCONTRAR MELHOR MATCH NA BASE DE DADOS
+  /// =========================================================================
   Future<Map<String, dynamic>?> _findBestMatch(
     DetectedObject detection,
     Map<String, dynamic> visualFeatures,
@@ -303,17 +372,14 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     for (var artigo in _artigosCache) {
       double confidence = 0.0;
       
-      // 1. Score baseado em labels ML Kit
       for (var label in detection.labels) {
         final labelText = label.text.toLowerCase();
         final artigoName = artigo.designacao.toLowerCase();
         
-        // Match direto no nome
         if (artigoName.contains(labelText) || labelText.contains(artigoName)) {
           confidence += label.confidence * 40;
         }
         
-        // Match por tipo
         if (artigo.tipo?.designacao != null) {
           final tipoName = artigo.tipo!.designacao.toLowerCase();
           if (tipoName.contains(labelText) || labelText.contains(tipoName)) {
@@ -321,7 +387,6 @@ class _ARScannerScreenState extends State<ARScannerScreen>
           }
         }
         
-        // Match por referência
         if (artigo.referencia != null) {
           final refLower = artigo.referencia!.toLowerCase();
           if (refLower.contains(labelText)) {
@@ -330,7 +395,6 @@ class _ARScannerScreenState extends State<ARScannerScreen>
         }
       }
       
-      // 2. Bonus por tipo de artigo
       if (artigo.tipo?.designacao != null) {
         final tipo = artigo.tipo!.designacao.toLowerCase();
         
@@ -347,7 +411,6 @@ class _ARScannerScreenState extends State<ARScannerScreen>
         }
       }
       
-      // 3. Bonus por bounding box
       final boxArea = detection.boundingBox.width * detection.boundingBox.height;
       confidence += min(boxArea / 10000, 10);
       
@@ -368,7 +431,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     return candidates.first;
   }
 
-  /// 📊 Mostrar resultado
+  /// =========================================================================
+  /// MOSTRAR RESULTADO DO MATCH
+  /// =========================================================================
   Future<void> _showMatchResult() async {
     if (_lastMatchedArtigo == null) return;
 
@@ -446,6 +511,7 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     } else {
       setState(() {
         _lastMatchedArtigo = null;
+        _lastDetection = null;
         _matchConfidence = 0.0;
         _statusMessage = 'Pronto! Aponte para um artigo';
       });
@@ -456,35 +522,24 @@ class _ARScannerScreenState extends State<ARScannerScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      
       appBar: AppBar(
         title: const Text('Scanner AR'),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
         actions: [
-          if (_artigosCache.isNotEmpty)
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '📦 ${_artigosCache.length}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showInfoDialog(),
           ),
         ],
       ),
+      
       body: Stack(
         children: [
-          // Preview câmara
+          // =========================================================
+          // PREVIEW DA CÂMARA (ECRÃ INTEIRO)
+          // =========================================================
           if (_isCameraInitialized && _cameraController != null)
             Positioned.fill(
               child: CameraPreview(_cameraController!),
@@ -505,18 +560,27 @@ class _ARScannerScreenState extends State<ARScannerScreen>
               ),
             ),
 
-          // Overlay AR
-          if (_isCameraInitialized)
+          // =========================================================
+          // OVERLAY AR - SÓ A CAIXA DE DETEÇÃO (SEM RETÍCULO)
+          // =========================================================
+          if (_isCameraInitialized && _lastDetection != null && _capturedImageSize != null)
             Positioned.fill(
-              child: CustomPaint(
-                painter: AROverlayPainter(
-                  detection: _lastDetection,
-                  imageSize: _cameraController?.value.previewSize,
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return CustomPaint(
+                    painter: ARDetectionPainter(
+                      detection: _lastDetection!,
+                      imageSize: _capturedImageSize!,
+                      screenSize: Size(constraints.maxWidth, constraints.maxHeight),
+                    ),
+                  );
+                },
               ),
             ),
 
-          // Status bar
+          // =========================================================
+          // BARRA DE ESTADO NO TOPO
+          // =========================================================
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
             left: 16,
@@ -553,7 +617,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
             ),
           ),
 
-          // Loading
+          // =========================================================
+          // OVERLAY DE LOADING
+          // =========================================================
           if (_isProcessing)
             Container(
               color: Colors.black45,
@@ -577,7 +643,9 @@ class _ARScannerScreenState extends State<ARScannerScreen>
               ),
             ),
 
-          // Botão captura
+          // =========================================================
+          // BOTÃO DE CAPTURA
+          // =========================================================
           Positioned(
             bottom: 40,
             left: 0,
@@ -614,22 +682,19 @@ class _ARScannerScreenState extends State<ARScannerScreen>
     );
   }
 
+  /// =========================================================================
+  /// MOSTRAR DIÁLOGO DE INFORMAÇÃO
+  /// =========================================================================
   void _showInfoDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(' Scanner AR'),
+        title: const Text('Scanner AR'),
         content: const SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              /*Text('Tecnologias:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Text('• Google ML Kit (detecção objetos)'),
-              Text('• Análise características visuais'),
-              Text('• Matching inteligente com BD'),
-              SizedBox(height: 16),*/
               Text('Como usar:', style: TextStyle(fontWeight: FontWeight.bold)),
               SizedBox(height: 8),
               Text('1. Aponte câmara para artigo'),
@@ -651,121 +716,198 @@ class _ARScannerScreenState extends State<ARScannerScreen>
   }
 }
 
-/// Painter para overlay AR
-class AROverlayPainter extends CustomPainter {
-  final DetectedObject? detection;
-  final Size? imageSize;
+/// =============================================================================
+/// PAINTER PARA A CAIXA DE DETEÇÃO
+/// =============================================================================
+/// Desenha APENAS a caixa verde à volta do objeto detetado.
+/// Sem retículo, sem quadrado do meio - ecrã limpo!
+/// 
+/// A conversão de coordenadas é feita corretamente considerando:
+/// - A imagem capturada normalmente está em modo landscape (sensor rotacionado)
+/// - O ecrã está em modo portrait
+/// - Precisamos rodar e escalar as coordenadas corretamente
+/// =============================================================================
+class ARDetectionPainter extends CustomPainter {
+  final DetectedObject detection;
+  final Size imageSize;
+  final Size screenSize;
 
-  AROverlayPainter({this.detection, this.imageSize});
+  ARDetectionPainter({
+    required this.detection,
+    required this.imageSize,
+    required this.screenSize,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    _drawTargetReticle(canvas, size);
+    final box = detection.boundingBox;
     
-    if (detection != null && imageSize != null) {
-      _drawDetectionBox(canvas, size);
+    // =======================================================================
+    // CONVERSÃO DE COORDENADAS CORRIGIDA
+    // =======================================================================
+    // A imagem da câmara normalmente é capturada em landscape (ex: 1920x1080)
+    // mas o ecrã está em portrait (ex: 1080x1920).
+    // O ML Kit dá as coordenadas baseadas na imagem original.
+    // Precisamos converter para as coordenadas do ecrã.
+    // =======================================================================
+    
+    // Verifica se precisamos rodar (imagem landscape, ecrã portrait)
+    final bool needsRotation = imageSize.width > imageSize.height && 
+                               screenSize.height > screenSize.width;
+    
+    Rect scaledRect;
+    
+    if (needsRotation) {
+      // A imagem está rotacionada 90° em relação ao ecrã
+      // Precisamos trocar X por Y e ajustar a origem
+      
+      // Dimensões efetivas após rotação
+      final rotatedImageWidth = imageSize.height;
+      final rotatedImageHeight = imageSize.width;
+      
+      // Fatores de escala
+      final scaleX = screenSize.width / rotatedImageWidth;
+      final scaleY = screenSize.height / rotatedImageHeight;
+      
+      // Converter coordenadas (rotação 90° sentido horário)
+      // Novo X = imagem.height - box.bottom (espelhado)
+      // Novo Y = box.left
+      final newLeft = (imageSize.height - box.bottom) * scaleX;
+      final newTop = box.left * scaleY;
+      final newWidth = box.height * scaleX;
+      final newHeight = box.width * scaleY;
+      
+      scaledRect = Rect.fromLTWH(newLeft, newTop, newWidth, newHeight);
+      
+    } else {
+      // Sem rotação necessária - escala direta
+      final scaleX = screenSize.width / imageSize.width;
+      final scaleY = screenSize.height / imageSize.height;
+      
+      scaledRect = Rect.fromLTWH(
+        box.left * scaleX,
+        box.top * scaleY,
+        box.width * scaleX,
+        box.height * scaleY,
+      );
     }
-  }
-
-  void _drawTargetReticle(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    const padding = 80.0;
-    final targetSize = size.width - (padding * 2);
-    final targetRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2),
-      width: targetSize,
-      height: targetSize,
-    );
-
-    canvas.drawPath(
-      Path.combine(
-        PathOperation.difference,
-        Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
-        Path()..addRect(targetRect),
-      ),
-      paint,
-    );
-
-    final borderPaint = Paint()
-      ..color = Colors.orange
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke;
-
-    const cornerLength = 40.0;
-    final left = targetRect.left;
-    final right = targetRect.right;
-    final top = targetRect.top;
-    final bottom = targetRect.bottom;
-
-    canvas.drawLine(Offset(left, top), Offset(left + cornerLength, top), borderPaint);
-    canvas.drawLine(Offset(left, top), Offset(left, top + cornerLength), borderPaint);
-    canvas.drawLine(Offset(right, top), Offset(right - cornerLength, top), borderPaint);
-    canvas.drawLine(Offset(right, top), Offset(right, top + cornerLength), borderPaint);
-    canvas.drawLine(Offset(left, bottom), Offset(left + cornerLength, bottom), borderPaint);
-    canvas.drawLine(Offset(left, bottom), Offset(left, bottom - cornerLength), borderPaint);
-    canvas.drawLine(Offset(right, bottom), Offset(right - cornerLength, bottom), borderPaint);
-    canvas.drawLine(Offset(right, bottom), Offset(right, bottom - cornerLength), borderPaint);
-
-    final centerPaint = Paint()
-      ..color = Colors.orange.withOpacity(0.5)
-      ..strokeWidth = 2;
-
-    canvas.drawLine(
-      Offset(size.width / 2 - 20, size.height / 2),
-      Offset(size.width / 2 + 20, size.height / 2),
-      centerPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width / 2, size.height / 2 - 20),
-      Offset(size.width / 2, size.height / 2 + 20),
-      centerPaint,
-    );
-  }
-
-  void _drawDetectionBox(Canvas canvas, Size size) {
-    final box = detection!.boundingBox;
-    final scaleX = size.width / imageSize!.width;
-    final scaleY = size.height / imageSize!.height;
     
-    final rect = Rect.fromLTWH(
-      box.left * scaleX,
-      box.top * scaleY,
-      box.width * scaleX,
-      box.height * scaleY,
+    // Garante que o retângulo está dentro dos limites do ecrã
+    scaledRect = Rect.fromLTWH(
+      scaledRect.left.clamp(0, screenSize.width - scaledRect.width),
+      scaledRect.top.clamp(0, screenSize.height - scaledRect.height),
+      scaledRect.width.clamp(10, screenSize.width),
+      scaledRect.height.clamp(10, screenSize.height),
     );
 
-    final paint = Paint()
+    // =======================================================================
+    // DESENHAR CAIXA VERDE COM CANTOS ARREDONDADOS
+    // =======================================================================
+    
+    // Fundo semi-transparente
+    final fillPaint = Paint()
+      ..color = Colors.green.withOpacity(0.15)
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(scaledRect, const Radius.circular(8)),
+      fillPaint,
+    );
+    
+    // Borda verde
+    final borderPaint = Paint()
       ..color = Colors.green
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
 
-    canvas.drawRect(rect, paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(scaledRect, const Radius.circular(8)),
+      borderPaint,
+    );
+    
+    // =======================================================================
+    // DESENHAR CANTOS DESTACADOS
+    // =======================================================================
+    final cornerPaint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    
+    const cornerLength = 20.0;
+    final left = scaledRect.left;
+    final right = scaledRect.right;
+    final top = scaledRect.top;
+    final bottom = scaledRect.bottom;
+    
+    // Canto superior esquerdo
+    canvas.drawLine(Offset(left, top + cornerLength), Offset(left, top), cornerPaint);
+    canvas.drawLine(Offset(left, top), Offset(left + cornerLength, top), cornerPaint);
+    
+    // Canto superior direito
+    canvas.drawLine(Offset(right - cornerLength, top), Offset(right, top), cornerPaint);
+    canvas.drawLine(Offset(right, top), Offset(right, top + cornerLength), cornerPaint);
+    
+    // Canto inferior esquerdo
+    canvas.drawLine(Offset(left, bottom - cornerLength), Offset(left, bottom), cornerPaint);
+    canvas.drawLine(Offset(left, bottom), Offset(left + cornerLength, bottom), cornerPaint);
+    
+    // Canto inferior direito
+    canvas.drawLine(Offset(right - cornerLength, bottom), Offset(right, bottom), cornerPaint);
+    canvas.drawLine(Offset(right, bottom), Offset(right, bottom - cornerLength), cornerPaint);
 
-    if (detection!.labels.isNotEmpty) {
-      final label = detection!.labels.first;
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${label.text} (${(label.confidence * 100).toInt()}%)',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            backgroundColor: Colors.green,
-          ),
+    // =======================================================================
+    // DESENHAR LABEL (SE HOUVER)
+    // =======================================================================
+    if (detection.labels.isNotEmpty) {
+      final label = detection.labels.first;
+      final labelText = '${label.text} (${(label.confidence * 100).toInt()}%)';
+      
+      final textSpan = TextSpan(
+        text: labelText,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
         ),
+      );
+      
+      final textPainter = TextPainter(
+        text: textSpan,
         textDirection: TextDirection.ltr,
       );
       
       textPainter.layout();
-      textPainter.paint(canvas, Offset(rect.left, rect.top - 25));
+      
+      // Fundo do label
+      final labelBgRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          left,
+          top - textPainter.height - 8,
+          textPainter.width + 16,
+          textPainter.height + 8,
+        ),
+        const Radius.circular(4),
+      );
+      
+      final labelBgPaint = Paint()
+        ..color = Colors.green
+        ..style = PaintingStyle.fill;
+      
+      canvas.drawRRect(labelBgRect, labelBgPaint);
+      
+      // Texto do label
+      textPainter.paint(
+        canvas, 
+        Offset(left + 8, top - textPainter.height - 4),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant AROverlayPainter oldDelegate) {
-    return detection != oldDelegate.detection;
+  bool shouldRepaint(covariant ARDetectionPainter oldDelegate) {
+    return detection != oldDelegate.detection ||
+           imageSize != oldDelegate.imageSize ||
+           screenSize != oldDelegate.screenSize;
   }
 }

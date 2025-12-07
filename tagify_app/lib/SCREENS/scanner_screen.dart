@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../SCANNERS/NFC.dart';
 import '../SCANNERS/RFID.dart';
-import '../SCANNERS/AR.dart'; // ← NOVO!
+import '../SCANNERS/AR.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -80,9 +80,9 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         });
       }
       
-      print('✅ Câmara inicializada');
+      print(' Câmara inicializada');
     } catch (e) {
-      print('❌ Erro ao inicializar câmara: $e');
+      print(' Erro ao inicializar câmara: $e');
     }
   }
 
@@ -100,7 +100,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     
     try {
       await controller?.dispose();
-      print('🔴 Câmara libertada');
+      print(' Câmara libertada');
     } catch (e) {
       print('Erro ao libertar câmara: $e');
     }
@@ -124,7 +124,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   }
 
   void _onScanModeChanged(ScanMode mode) {
-    // ✅ AGORA AR TAMBÉM NAVEGA PARA ECRÃ DEDICADO!
+    //  AGORA AR TAMBÉM NAVEGA PARA ECRÃ DEDICADO!
     if (mode == ScanMode.ar) {
       _navigateToScreen(const ARScannerScreen());
       return;

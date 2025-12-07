@@ -14,16 +14,16 @@ class SyncService {
 
     try {
       onProgress?.call('Iniciando sincronização...');
-      print('🔄 Iniciando sincronização completa...');
+      print(' Iniciando sincronização completa...');
 
       // 1. Limpar dados antigos
       onProgress?.call('Limpando dados antigos...');
-      print('🗑️  Limpando dados antigos...');
+      print('  Limpando dados antigos...');
       await DatabaseHelper.instance.clearAllData();
 
       // 2. Buscar e inserir Tipos
       onProgress?.call('Sincronizando Tipos...');
-      print('📦 Sincronizando Tipos...');
+      print(' Sincronizando Tipos...');
       final tipos = await _fetchTipos();
       print('   Recebidos ${tipos.length} tipos');
       if (tipos.isNotEmpty) {
@@ -33,7 +33,7 @@ class SyncService {
 
       // 3. Buscar e inserir Famílias
       onProgress?.call('Sincronizando Famílias...');
-      print('📦 Sincronizando Famílias...');
+      print(' Sincronizando Famílias...');
       final familias = await _fetchFamilias();
       print('   Recebidas ${familias.length} famílias');
       if (familias.isNotEmpty) {
@@ -43,7 +43,7 @@ class SyncService {
 
       // 4. Buscar e inserir Estados
       onProgress?.call('Sincronizando Estados...');
-      print('📦 Sincronizando Estados...');
+      print(' Sincronizando Estados...');
       final estados = await _fetchEstados();
       print('   Recebidos ${estados.length} estados');
       if (estados.isNotEmpty) {
@@ -53,7 +53,7 @@ class SyncService {
 
       // 5. Buscar e inserir Armazéns
       onProgress?.call('Sincronizando Armazéns...');
-      print('📦 Sincronizando Armazéns...');
+      print(' Sincronizando Armazéns...');
       final armazens = await _fetchArmazens();
       print('   Recebidos ${armazens.length} armazéns');
       if (armazens.isNotEmpty) {
@@ -63,7 +63,7 @@ class SyncService {
 
       // 6. Buscar e inserir Artigos
       onProgress?.call('Sincronizando Artigos...');
-      print('📦 Sincronizando Artigos...');
+      print(' Sincronizando Artigos...');
       final artigos = await _fetchArtigos();
       print('   Recebidos ${artigos.length} artigos');
       if (artigos.isNotEmpty) {
@@ -73,7 +73,7 @@ class SyncService {
 
       // 7. Buscar e inserir Equipamentos
       onProgress?.call('Sincronizando Equipamentos...');
-      print('📦 Sincronizando Equipamentos...');
+      print(' Sincronizando Equipamentos...');
       final equipamentos = await _fetchEquipamentos();
       print('   Recebidos ${equipamentos.length} equipamentos');
       if (equipamentos.isNotEmpty) {
@@ -83,7 +83,7 @@ class SyncService {
 
       // 8. Buscar e inserir Movimentos
       onProgress?.call('Sincronizando Movimentos...');
-      print('📦 Sincronizando Movimentos...');
+      print(' Sincronizando Movimentos...');
       final movimentos = await _fetchMovimentos();
       print('   Recebidos ${movimentos.length} movimentos');
       if (movimentos.isNotEmpty) {
@@ -93,7 +93,7 @@ class SyncService {
 
       // 9. Buscar e inserir Utilizadores
       onProgress?.call('Sincronizando Utilizadores...');
-      print('📦 Sincronizando Utilizadores...');
+      print(' Sincronizando Utilizadores...');
       final utilizadores = await _fetchUtilizadores();
       print('   Recebidos ${utilizadores.length} utilizadores');
       if (utilizadores.isNotEmpty) {
@@ -106,11 +106,11 @@ class SyncService {
 
       final duration = DateTime.now().difference(startTime);
       onProgress?.call('Sincronização concluída!');
-      print('✅ Sincronização concluída! Total: $totalRecords registos em ${duration.inSeconds}s');
+      print(' Sincronização concluída! Total: $totalRecords registos em ${duration.inSeconds}s');
 
       // Verificar estatísticas finais
       final stats = await DatabaseHelper.instance.getStats();
-      print('📊 Estatísticas finais:');
+      print(' Estatísticas finais:');
       stats.forEach((key, value) {
         print('   $key: $value');
       });
@@ -122,7 +122,7 @@ class SyncService {
         message: 'Sincronização concluída com sucesso!',
       );
     } catch (e, stackTrace) {
-      print('❌ Erro na sincronização: $e');
+      print(' Erro na sincronização: $e');
       print('Stack trace: $stackTrace');
       
       // Registar erro
@@ -154,7 +154,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar tipos: $e');
+      print('     Erro ao buscar tipos: $e');
       throw Exception('Erro ao buscar tipos: $e');
     }
   }
@@ -171,7 +171,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar famílias: $e');
+      print('     Erro ao buscar famílias: $e');
       throw Exception('Erro ao buscar famílias: $e');
     }
   }
@@ -188,7 +188,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar estados: $e');
+      print('     Erro ao buscar estados: $e');
       throw Exception('Erro ao buscar estados: $e');
     }
   }
@@ -205,7 +205,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar armazéns: $e');
+      print('     Erro ao buscar armazéns: $e');
       throw Exception('Erro ao buscar armazéns: $e');
     }
   }
@@ -222,7 +222,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar artigos: $e');
+      print('     Erro ao buscar artigos: $e');
       throw Exception('Erro ao buscar artigos: $e');
     }
   }
@@ -239,7 +239,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar equipamentos: $e');
+      print('     Erro ao buscar equipamentos: $e');
       throw Exception('Erro ao buscar equipamentos: $e');
     }
   }
@@ -256,7 +256,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar movimentos: $e');
+      print('     Erro ao buscar movimentos: $e');
       throw Exception('Erro ao buscar movimentos: $e');
     }
   }
@@ -273,7 +273,7 @@ class SyncService {
       }
       throw Exception('Status ${response.statusCode}: ${response.body}');
     } catch (e) {
-      print('   ⚠️  Erro ao buscar utilizadores: $e');
+      print('     Erro ao buscar utilizadores: $e');
       throw Exception('Erro ao buscar utilizadores: $e');
     }
   }
@@ -282,7 +282,7 @@ class SyncService {
   /// Remove objetos aninhados e converte booleanos para int
   Map<String, dynamic> _convertToSQLiteMap(dynamic data) {
     if (data is! Map) {
-      print('⚠️  Dado não é Map: $data');
+      print('  Dado não é Map: $data');
       return {};
     }
 

@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isDisposed = false;
   bool _isSwitching = false;
   
-  // ✅ ALTERADO: Agora inicia com BARCODE por defeito
+  //   Agora inicia com BARCODE por defeito
   ScanMethod _selectedMethod = ScanMethod.barcode;
   int _selectedBottomIndex = 1;
   
@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // ✅ ALTERADO: Inicia com MobileScanner (para barcode)
+    //   Inicia com MobileScanner (para barcode)
     _initializeMobileScanner();
   }
 
@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     
     try {
-      // ✅ Para o MobileScanner antes de fazer dispose
+      //  Para o MobileScanner antes de fazer dispose
       if (mobileScannerController != null) {
         await mobileScannerController.stop();
         await Future.delayed(const Duration(milliseconds: 100));
@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       
       await cameraController?.dispose();
-      print('🔴 Câmaras libertadas');
+      print(' Câmaras libertadas');
     } catch (e) {
       print('Erro ao libertar câmaras: $e');
     }
@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     try {
       await controller?.dispose();
-      print('🔴 CameraController libertado');
+      print(' CameraController libertado');
     } catch (e) {
       print('Erro ao libertar CameraController: $e');
     }
@@ -117,16 +117,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _mobileScannerController = null;
     
     if (controller == null) {
-      print('⚠️ MobileScannerController já era null');
+      print(' MobileScannerController já era null');
       return;
     }
     
     try {
-      // ✅ Para a câmara antes de fazer dispose
+      //  Para a câmara antes de fazer dispose
       await controller.stop();
       await Future.delayed(const Duration(milliseconds: 100));
       await controller.dispose();
-      print('🔴 MobileScannerController libertado');
+      print(' MobileScannerController libertado');
     } catch (e) {
       print('Erro ao libertar MobileScannerController: $e');
     }
@@ -165,23 +165,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
       
-      print('✅ CameraController inicializado');
+      print(' CameraController inicializado');
     } catch (e) {
-      print('❌ Erro ao inicializar câmara: $e');
+      print(' Erro ao inicializar câmara: $e');
     }
   }
 
   Future<void> _initializeMobileScanner() async {
     if (_isDisposed) return;
     
-    // ✅ Garante que o controller anterior foi libertado
+    //  Garante que o controller anterior foi libertado
     if (_mobileScannerController != null) {
-      print('⚠️ MobileScannerController já existe, a libertar primeiro...');
+      print(' MobileScannerController já existe, a libertar primeiro...');
       await _disposeMobileScannerController();
       await Future.delayed(const Duration(milliseconds: 300));
     }
     
-    print('📷 A criar MobileScannerController...');
+    print(' A criar MobileScannerController...');
     
     try {
       final controller = MobileScannerController(
@@ -190,10 +190,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         returnImage: false,
       );
       
-      // ✅ Aguarda que o controller esteja realmente pronto
+      //  Aguarda que o controller esteja realmente pronto
       await controller.start();
       
-      print('📷 MobileScannerController iniciado, a aguardar...');
+      print(' MobileScannerController iniciado, a aguardar...');
       
       await Future.delayed(const Duration(milliseconds: 300));
       
@@ -206,14 +206,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       
       if (mounted) {
         setState(() {});
-        print('✅ MobileScannerController inicializado e UI atualizada');
+        print(' MobileScannerController inicializado e UI atualizada');
       }
     } catch (e) {
-      print('❌ Erro ao inicializar MobileScanner: $e');
+      print(' Erro ao inicializar MobileScanner: $e');
       
-      // ✅ Tenta novamente após um delay
+      //  Tenta novamente após um delay
       if (mounted && !_isDisposed) {
-        print('🔄 A tentar reinicializar MobileScanner...');
+        print(' A tentar reinicializar MobileScanner...');
         await Future.delayed(const Duration(milliseconds: 500));
         
         try {
@@ -225,10 +225,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           
           if (mounted) {
             setState(() {});
-            print('✅ MobileScannerController reinicializado com sucesso');
+            print(' MobileScannerController reinicializado com sucesso');
           }
         } catch (e2) {
-          print('❌ Segunda tentativa falhou: $e2');
+          print(' Segunda tentativa falhou: $e2');
         }
       }
     }
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // TRANSIÇÃO: AR -> QR/Barcode
       if ((previousMethod == ScanMethod.ar) && 
           (method == ScanMethod.qrcode || method == ScanMethod.barcode)) {
-        print('🔄 Transição: AR -> ${method.name}');
+        print(' Transição: AR -> ${method.name}');
         
         await _disposeCameraController();
         
@@ -278,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // TRANSIÇÃO: QR/Barcode -> AR
       else if ((previousMethod == ScanMethod.qrcode || previousMethod == ScanMethod.barcode) && 
                method == ScanMethod.ar) {
-        print('🔄 Transição: ${previousMethod.name} -> AR');
+        print(' Transição: ${previousMethod.name} -> AR');
         
         await _disposeMobileScannerController();
         
@@ -290,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // TRANSIÇÃO: QR <-> Barcode (mesmo tipo de scanner)
       else if ((previousMethod == ScanMethod.qrcode && method == ScanMethod.barcode) ||
                (previousMethod == ScanMethod.barcode && method == ScanMethod.qrcode)) {
-        print('🔄 Transição: ${previousMethod.name} -> ${method.name} (mesmo scanner)');
+        print(' Transição: ${previousMethod.name} -> ${method.name} (mesmo scanner)');
         // Não precisa fazer nada, apenas muda o overlay
       }
     } finally {
@@ -309,9 +309,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     await Navigator.of(context).pushNamed(route);
     
-    // ✅ CORRIGIDO: Aguarda mais tempo para libertar recursos da câmara
+    //   Aguarda mais tempo para libertar recursos da câmara
     if (mounted && !_isDisposed) {
-      print('🔄 A voltar do scanner externo, aguardando libertação de recursos...');
+      print(' A voltar do scanner externo, aguardando libertação de recursos...');
       await Future.delayed(const Duration(milliseconds: 800));
       
       // Força recriação do MobileScanner
@@ -333,9 +333,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       MaterialPageRoute(builder: (_) => const ARScannerScreen()),
     );
     
-    // ✅ CORRIGIDO: Aguarda mais tempo para libertar recursos da câmara
+    //   Aguarda mais tempo para libertar recursos da câmara
     if (mounted && !_isDisposed) {
-      print('🔄 A voltar do AR, aguardando libertação de recursos...');
+      print(' A voltar do AR, aguardando libertação de recursos...');
       await Future.delayed(const Duration(milliseconds: 800));
       
       // Força recriação do MobileScanner
@@ -481,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
             const SizedBox(height: 16),
 
-            // ✅ ALTERADO: Barra de métodos com BARRAS no centro
+            //   Barra de métodos com BARRAS no centro
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -498,13 +498,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     icon: Icons.nfc,
                     label: 'NFC',
                   ),
-                  // ✅ BARRAS agora está no CENTRO (posição 3)
+                  //  BARRAS agora está no CENTRO (posição 3)
                   _buildScanMethodButton(
                     method: ScanMethod.barcode,
                     icon: Icons.barcode_reader,
                     label: 'Barras',
                   ),
-                  // ✅ AR trocou de posição (posição 4)
+                  //  AR trocou de posição (posição 4)
                   _buildScanMethodButton(
                     method: ScanMethod.ar,
                     icon: Icons.view_in_ar,
@@ -578,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
     
-    // ✅ Key única baseada no hashCode do controller para forçar recriação
+    //  Key única baseada no hashCode do controller para forçar recriação
     return MobileScanner(
       key: ValueKey(_mobileScannerController.hashCode),
       controller: _mobileScannerController!,

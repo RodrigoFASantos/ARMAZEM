@@ -49,7 +49,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         format == BarcodeFormat.aztec ||
         format == BarcodeFormat.dataMatrix ||
         format == BarcodeFormat.pdf417) {
-      print('⚠️ Formato rejeitado: $format (não é código de barras linear)');
+      print(' Formato rejeitado: $format (não é código de barras linear)');
       return false;
     }
     
@@ -76,7 +76,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         setState(() => _isSearching = true);
         _controller.stop();
 
-        print('📦 Código de Barras detectado: $code (formato: $format)');
+        print(' Código de Barras detectado: $code (formato: $format)');
 
         try {
           final artigo = await _apiService.getArtigoByCodigo(code);
@@ -93,7 +93,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
             _controller.start();
           }
         } catch (e) {
-          print('❌ Erro ao buscar artigo: $e');
+          print(' Erro ao buscar artigo: $e');
           if (mounted) {
             _showErrorDialog('Erro na busca', 'Não foi possível buscar o artigo.\n\n$e');
             setState(() => _isSearching = false);
@@ -183,7 +183,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                     borderRadius: BorderRadius.circular(25),
                   ),
                   child: const Text(
-                    '📦 Aponte para o código de barras',
+                    ' Aponte para o código de barras',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
