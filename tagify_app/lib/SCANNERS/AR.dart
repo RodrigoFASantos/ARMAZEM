@@ -770,8 +770,8 @@ class ARDetectionPainter extends CustomPainter {
       final scaleY = screenSize.height / rotatedImageHeight;
       
       // Converter coordenadas (rotação 90° sentido horário)
-      // Novo X = imagem.height - box.bottom (espelhado)
-      // Novo Y = box.left
+      // X = imagem.height - box.bottom (espelhado)
+      // Y = box.left
       final newLeft = (imageSize.height - box.bottom) * scaleX;
       final newTop = box.left * scaleY;
       final newWidth = box.height * scaleX;
